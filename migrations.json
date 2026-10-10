@@ -1,0 +1,44 @@
+{
+  "migrations": [
+    {
+      "name": "0001_init",
+      "sql": "CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, user_id TEXT, title TEXT NOT NULL, status TEXT, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_items_created_at ON items (created_at)"
+    },
+    {
+      "name": "0002_clubs_and_comps",
+      "sql": "CREATE TABLE IF NOT EXISTS organizations (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT NOT NULL UNIQUE, logo_url TEXT, created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS club_memberships (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','convenor','manager','player','parent')), display_name TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, UNIQUE(org_id, user_id)); CREATE INDEX IF NOT EXISTS idx_memberships_user ON club_memberships(user_id); CREATE TABLE IF NOT EXISTS seasons (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), name TEXT NOT NULL, starts_on TEXT NOT NULL, ends_on TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'upcoming' CHECK(status IN ('upcoming','active','complete')), created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS divisions (id TEXT PRIMARY KEY, season_id TEXT NOT NULL REFERENCES seasons(id), name TEXT NOT NULL, format TEXT, created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS venues (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), name TEXT NOT NULL, address TEXT, map_url TEXT, notes TEXT, created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS teams (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), division_id TEXT REFERENCES divisions(id), name TEXT NOT NULL, colour TEXT, created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS team_players (team_id TEXT NOT NULL REFERENCES teams(id), user_id TEXT NOT NULL, display_name TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(team_id, user_id)); CREATE INDEX IF NOT EXISTS idx_team_players_user ON team_players(user_id); CREATE TABLE IF NOT EXISTS fixtures (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), division_id TEXT REFERENCES divisions(id), home_team_id TEXT NOT NULL REFERENCES teams(id), away_team_id TEXT NOT NULL REFERENCES teams(id), venue_id TEXT REFERENCES venues(id), starts_at TEXT NOT NULL, round_label TEXT, status TEXT NOT NULL DEFAULT 'scheduled' CHECK(status IN ('scheduled','washout','heat_out','forfeit','complete')), home_score INTEGER, away_score INTEGER, notes TEXT, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_fixtures_org_time ON fixtures(org_id, starts_at); CREATE TABLE IF NOT EXISTS fixture_roster (fixture_id TEXT NOT NULL REFERENCES fixtures(id), user_id TEXT NOT NULL, display_name TEXT NOT NULL, availability TEXT NOT NULL DEFAULT 'pending' CHECK(availability IN ('in','out','pending')), confirmed_at INTEGER, PRIMARY KEY(fixture_id, user_id)); CREATE INDEX IF NOT EXISTS idx_fixture_roster_user ON fixture_roster(user_id)"
+    },
+    {
+      "name": "0003_club_admin_invites",
+      "sql": "CREATE TABLE IF NOT EXISTS team_memberships (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), team_id TEXT NOT NULL REFERENCES teams(id), user_id TEXT, display_name TEXT, invite_token TEXT UNIQUE, created_by TEXT NOT NULL, accepted_at INTEGER, created_at INTEGER NOT NULL, CHECK((user_id IS NULL AND invite_token IS NOT NULL) OR (user_id IS NOT NULL AND invite_token IS NULL))); CREATE UNIQUE INDEX IF NOT EXISTS idx_team_memberships_team_user ON team_memberships(team_id, user_id) WHERE user_id IS NOT NULL; CREATE INDEX IF NOT EXISTS idx_team_memberships_user ON team_memberships(user_id); CREATE INDEX IF NOT EXISTS idx_team_memberships_org ON team_memberships(org_id, team_id);"
+    },
+    {
+      "name": "0003_fixture_import_roster",
+      "sql": "CREATE TABLE IF NOT EXISTS roster_players (id TEXT PRIMARY KEY, fixture_id TEXT NOT NULL REFERENCES fixtures(id), player_name TEXT NOT NULL, contact TEXT, availability TEXT, created_at INTEGER NOT NULL); CREATE UNIQUE INDEX IF NOT EXISTS idx_roster_players_fixture_name ON roster_players(fixture_id, player_name); CREATE INDEX IF NOT EXISTS idx_roster_players_fixture ON roster_players(fixture_id); CREATE UNIQUE INDEX IF NOT EXISTS idx_fixtures_import_natural_key ON fixtures(org_id, round_label, starts_at, home_team_id, away_team_id)"
+    },
+    {
+      "name": "0004_club_admin_invites",
+      "sql": "CREATE TABLE IF NOT EXISTS team_memberships (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), team_id TEXT NOT NULL REFERENCES teams(id), user_id TEXT, display_name TEXT, invite_token TEXT UNIQUE, created_by TEXT NOT NULL, accepted_at INTEGER, created_at INTEGER NOT NULL, CHECK((user_id IS NULL AND invite_token IS NOT NULL) OR (user_id IS NOT NULL AND invite_token IS NULL))); CREATE UNIQUE INDEX IF NOT EXISTS idx_team_memberships_team_user ON team_memberships(team_id, user_id) WHERE user_id IS NOT NULL; CREATE INDEX IF NOT EXISTS idx_team_memberships_user ON team_memberships(user_id); CREATE INDEX IF NOT EXISTS idx_team_memberships_org ON team_memberships(org_id, team_id);"
+    },
+    {
+      "name": "0004_fixture_roster_activity",
+      "sql": "CREATE TABLE IF NOT EXISTS fixture_roster_activity (id INTEGER PRIMARY KEY AUTOINCREMENT, fixture_id TEXT NOT NULL REFERENCES fixtures(id), user_id TEXT NOT NULL, display_name TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('added','removed','availability_changed')), old_availability TEXT, new_availability TEXT, actor_user_id TEXT, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_fixture_roster_activity_fixture ON fixture_roster_activity(fixture_id, created_at DESC);"
+    },
+    {
+      "name": "0005_organization_creator",
+      "sql": "ALTER TABLE organizations ADD COLUMN created_by TEXT"
+    },
+    {
+      "name": "0005_venue_travel_details",
+      "sql": "ALTER TABLE venues ADD COLUMN convenor_phone TEXT; CREATE INDEX IF NOT EXISTS idx_fixtures_venue ON fixtures(venue_id);"
+    },
+    {
+      "name": "0006_match_day_status_notices",
+      "sql": "ALTER TABLE fixtures ADD COLUMN status_updated_at INTEGER; ALTER TABLE fixtures ADD COLUMN match_notice TEXT;"
+    },
+    {
+      "name": "0007_fixture_result_submissions",
+      "sql": "CREATE TABLE fixture_result_submissions (id TEXT PRIMARY KEY, fixture_id TEXT NOT NULL REFERENCES fixtures(id), submitted_by TEXT NOT NULL, home_score INTEGER NOT NULL CHECK(home_score>=0), away_score INTEGER NOT NULL CHECK(away_score>=0), set_results TEXT, scorecard_user_id TEXT, scorecard_path TEXT, submitted_at INTEGER NOT NULL, correction_note TEXT); CREATE INDEX idx_fixture_results_history ON fixture_result_submissions(fixture_id,submitted_at DESC);"
+    }
+  ]
+}

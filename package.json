@@ -1,0 +1,15 @@
+{
+  "name": "tennis-clubs",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": { "node": ">=22" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] },
+  "scripts": {
+    "dev": "pnpm --filter @tennis-clubs/web dev",
+    "prebuild": "npx -y @proappstore/cli@latest check",
+    "build": "pnpm --filter @tennis-clubs/web build",
+    "preview": "pnpm --filter @tennis-clubs/web preview",
+    "typecheck": "pnpm --filter @tennis-clubs/web exec tsc -b",
+    "test": "python3 -m unittest discover -s tests -v && pnpm --filter @tennis-clubs/web exec vitest run && pnpm --filter @tennis-clubs/web exec tsc -b"
+  }
+}

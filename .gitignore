@@ -1,0 +1,11 @@
+node_modules/
+__pycache__/
+dist/
+.cache/
+*.tsbuildinfo
+.env
+.env.local
+.env.production
+.vite/
+.vibe-check/
+.pas.json

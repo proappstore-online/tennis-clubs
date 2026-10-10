@@ -1,0 +1,44 @@
+name: CI
+
+# Straight-to-main delivery: run on every push to main, not only on PRs
+# (PAS-OPS-004; proappstore-online/platform#204).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Check public snapshot privacy and commit metadata
+        run: python3 scripts/check-public-snapshot.py
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Python unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Vitest (rendered UI regression)
+        run: pnpm --filter @tennis-clubs/web exec vitest run
