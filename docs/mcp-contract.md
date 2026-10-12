@@ -60,7 +60,7 @@ Admins of a club import one competition draw with `import_competition_draw` (dry
 
 Run the steps in this order: `apply_draw_seasons`, `apply_draw_divisions`, `apply_draw_venues`, `apply_draw_external_clubs`, `apply_draw_external_aliases`, `apply_draw_placeholders`, `apply_draw_teams`, `apply_draw_fixtures`, `apply_draw_roster`, `apply_draw_venue_updates`, `apply_draw_fixture_updates`, `apply_draw_provenance`. Each step writes only the records the dry run classifies as creatable or updatable, so a rerun changes nothing that is already imported and resumes a partial import. Record the run with `record_draw_import_run`, then the plan rows with `record_draw_import_outcomes`, and read the counts with `get_draw_import_report`.
 
-Outcomes are `add`, `adopt` (matched an existing record by name and linked it), `unchanged`, `update`, `conflict` (ambiguous names, an alias owned by another club, or a changed fingerprint on a record that is not updated automatically) and `error`. A conflict skips only that record and its dependants; it is reported, not written.
+Outcomes are `add`, `adopt` (matched an existing record by name and linked it), `unchanged`, `update`, `conflict` (ambiguous names, an alias owned by another club, or a changed fingerprint on a record that is not updated automatically) and `error`. A conflict skips only that record and its dependants; it is reported, not written. Each planned record also has an outcome: `add` is created, `update` is updated, `unchanged` is skipped, and `conflict` or a validation error is conflicted. `adopt`, and an update that would downgrade a fixture's time, are skipped with the warning flag set. `failed` is reserved for a write that fails at run time; a single plan never reports it, because the apply steps are separate actions.
 
 Atomicity: the platform runs one SQL statement per action, so the steps are not a single transaction. Each step is all-or-nothing on its own, and the run is resumable because every step is idempotent. A caller that stops between steps leaves a partial import that the next run completes. Provenance records (`import_provenance`) hold the source system, key, fingerprint and the importer's run id. Contact details are never accepted or stored by this import.
 
@@ -158,8 +158,8 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `apply_draw_venue_updates` | execute | `admin` | admin | idempotent | yes | no | no |
 | `apply_draw_fixture_updates` | execute | `admin` | admin | idempotent | yes | no | no |
 | `apply_draw_provenance` | execute | `admin` | admin | idempotent | yes | no | no |
-| `record_draw_import_run` | execute | `admin` | admin | idempotent | no | no | no |
-| `record_draw_import_outcomes` | execute | `admin` | admin | idempotent | no | no | no |
+| `record_draw_import_run` | execute | `admin` | admin | idempotent | yes | no | no |
+| `record_draw_import_outcomes` | execute | `admin` | admin | idempotent | yes | no | no |
 | `import_competition_draw` | query | `admin` | admin | read-only | no | no | no |
 | `get_draw_import_report` | query | `admin` | admin | read-only | no | no | no |
 | `set_contact_detail` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
@@ -865,7 +865,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1342,7 +1342,7 @@ Returns: `changes`: rows written; 0 means not applied.
 Record the importer, time, source system, source run and payload hash of a competition-draw import run
 
 - Access: club-admin; roles: admin; audience: admin.
-- Idempotency: idempotent. Audit: not required.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
 
 | Parameter | Constraints |
 | --- | --- |
@@ -1359,7 +1359,7 @@ Returns: `changes`: rows written; 0 means not applied.
 Record the per-record outcome of a competition-draw import run (create, adopt, unchanged, update, conflict, error, skipped or failed) from a JSON array
 
 - Access: club-admin; roles: admin; audience: admin.
-- Idempotency: idempotent. Audit: not required.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
 
 | Parameter | Constraints |
 | --- | --- |
@@ -1371,7 +1371,7 @@ Returns: `changes`: rows written; 0 means not applied.
 
 ### `import_competition_draw`
 
-Dry run of a competition-draw import: validates the structured draw payload and reports, per record, whether it would be created, adopted, unchanged, updated, conflicted or rejected; writes nothing. Admins only.
+Dry run of a competition-draw import: validates the structured draw payload and reports, per record, the action it would take (add, adopt, unchanged, update, conflict or error), its severity (info, warning or blocking) and its outcome (created, updated, skipped, conflicted or failed). Writes nothing
 
 - Access: club-admin; roles: admin; audience: admin.
 - Idempotency: read-only. Audit: not required.
@@ -1381,11 +1381,11 @@ Dry run of a competition-draw import: validates the structured draw payload and 
 | `org_id` | string |
 | `payload` | string |
 
-Returns: `entity_type`, `source_key`, `action`, `severity`, `message`
+Returns: `entity_type`, `source_key`, `action`, `severity`, `message`, `outcome`
 
 ### `get_draw_import_report`
 
-Structured report of one competition-draw import run: record counts by outcome (create, adopt, unchanged, update, conflict, error, skipped, failed)
+Structured report of one competition-draw import run: record counts by outcome (created, updated, skipped, conflicted or failed) with the warning flag
 
 - Access: club-admin; roles: admin; audience: admin.
 - Idempotency: read-only. Audit: not required.
@@ -1395,7 +1395,7 @@ Structured report of one competition-draw import run: record counts by outcome (
 | `org_id` | string |
 | `import_run_id` | string |
 
-Returns: `action`, `severity`, `records`
+Returns: `outcome`, `warning`, `records`
 
 ### `set_contact_detail`
 

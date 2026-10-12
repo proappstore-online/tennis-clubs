@@ -1604,6 +1604,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "delete_contact_detail",
           "mark_document_stored",
           "reconcile_imported_fixture_time",
+          "record_draw_import_outcomes",
+          "record_draw_import_run",
           "register_document",
           "remove_fixture_roster_player",
           "schedule_fixture",
@@ -2652,7 +2654,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     "access": "club-admin",
     "audience": "admin",
     "idempotency": "idempotent",
-    "audit": false,
+    "audit": true,
     "paging": false,
     "versioned": false,
     "params": [
@@ -2688,7 +2690,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     "access": "club-admin",
     "audience": "admin",
     "idempotency": "idempotent",
-    "audit": false,
+    "audit": true,
     "paging": false,
     "versioned": false,
     "params": [
@@ -2708,7 +2710,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "import_competition_draw",
-    "description": "Dry run of a competition-draw import: validates the structured draw payload and reports, per record, whether it would be created, adopted, unchanged, updated, conflicted or rejected; writes nothing. Admins only.",
+    "description": "Dry run of a competition-draw import: validates the structured draw payload and reports, per record, the action it would take (add, adopt, unchanged, update, conflict or error), its severity (info, warning or blocking) and its outcome (created, updated, skipped, conflicted or failed). Writes nothing",
     "operation": "query",
     "roles": [
       "admin"
@@ -2732,7 +2734,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "get_draw_import_report",
-    "description": "Structured report of one competition-draw import run: record counts by outcome (create, adopt, unchanged, update, conflict, error, skipped, failed)",
+    "description": "Structured report of one competition-draw import run: record counts by outcome (created, updated, skipped, conflicted or failed) with the warning flag",
     "operation": "query",
     "roles": [
       "admin"

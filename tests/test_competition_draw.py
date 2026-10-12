@@ -224,18 +224,75 @@ class CompetitionDrawTests(unittest.TestCase):
     def test_import_run_and_report_are_recorded_with_importer_and_counts(self):
         plan = self.plan()
         self.apply_all()
-        outcomes = json.dumps([{"entity_type": r["entity_type"], "source_key": r["source_key"], "action": r["action"], "severity": r["severity"], "message": r["message"]} for r in plan])
+        outcomes = json.dumps([{"entity_type": r["entity_type"], "source_key": r["source_key"], "action": r["action"], "severity": r["severity"], "message": r["message"], "outcome": r["outcome"]} for r in plan])
         self.call("record_draw_import_run", source_system="fixture-book", source_run="2026-spring-v1", payload_sha256=fp(json.dumps(self.payload)))
         self.call("record_draw_import_outcomes", outcomes=outcomes)
         run = dict(self.db.execute("SELECT source_system,source_run,importer_user_id FROM draw_import_runs WHERE id='run-1'").fetchone())
         self.assertEqual(run, {"source_system": "fixture-book", "source_run": "2026-spring-v1", "importer_user_id": "admin-a"})
-        report = {row["action"]: row["records"] for row in self.call("get_draw_import_report", import_run_id="run-1").fetchall()}
-        self.assertEqual(sum(report.values()), len(plan))
+        report = {row["outcome"]: row["records"] for row in self.call("get_draw_import_report", import_run_id="run-1").fetchall()}
+        self.assertEqual(report, {"created": len(plan)})
         self.assertEqual(self.call("get_draw_import_report", user="conv-a", import_run_id="run-1").fetchall(), [])
 
     def test_a_run_is_recorded_only_by_admins_of_its_club(self):
         self.call("record_draw_import_run", user="admin-b", source_system="fixture-book", source_run="x", payload_sha256="0" * 64)
         self.assertEqual(self.count("draw_import_runs"), 0)
+
+    def by_key(self, plan):
+        return {(row["entity_type"], row["source_key"]): row for row in plan}
+
+    def test_dry_run_warnings_appear_for_adopt_and_downgrade(self):
+        self.db.execute("INSERT INTO venues(id,org_id,name,address,map_url,notes,convenor_phone,created_at) VALUES ('v-manual','a','central courts',NULL,NULL,NULL,NULL,1)")
+        adopted = self.by_key(self.plan())[("venue", "central")]
+        self.assertEqual((adopted["action"], adopted["severity"], adopted["outcome"]), ("adopt", "warning", "skipped"))
+        self.apply_all()
+        # A later source offers a weaker time (TBC) for a confirmed fixture: the plan says update, flags a warning, and the step writes nothing.
+        self.payload["fixtures"][0]["time_status"] = "tbc"
+        refingerprint(self.payload, "fixtures", "r1", "fixture-r1-tbc")
+        downgraded = self.by_key(self.plan())[("fixture", "r1")]
+        self.assertEqual((downgraded["action"], downgraded["severity"], downgraded["outcome"]), ("update", "warning", "skipped"))
+        self.assertEqual(self.step("apply_draw_fixture_updates"), 0)
+        self.assertEqual(self.db.execute("SELECT time_status FROM fixtures WHERE round_label='R1'").fetchone()[0], "confirmed")
+
+    def test_skipped_outcome_on_rerun(self):
+        self.apply_all()
+        plan = self.plan()
+        self.assertEqual({row["outcome"] for row in plan}, {"skipped"})
+        self.assertEqual({row["action"] for row in plan}, {"unchanged"})
+
+    def test_venue_notes_with_contact_details_block_the_import(self):
+        for notes in ("Ring 0400 000 000 at the gate", "Email gate@example.test for access"):
+            with self.subTest(notes=notes):
+                self.payload["venues"][0]["notes"] = notes
+                blocked = [row for row in self.plan() if row["severity"] == "blocking"]
+                self.assertEqual([(row["entity_type"], row["message"]) for row in blocked], [("venue", "contact_in_notes")])
+                self.assertEqual({step: self.step(step) for step in STEPS}, {step: 0 for step in STEPS})
+                self.assertEqual(self.count("venues"), 0)
+
+    def test_apply_venue_updates_changes_address_map_link_and_notes(self):
+        self.apply_all()
+        self.payload["venues"][0].update({"address": "2 Court Rd", "map_url": "https://maps.example/central", "notes": "Gate 3"})
+        refingerprint(self.payload, "venues", "central", "venue-central-v2")
+        self.assertEqual(self.by_key(self.plan())[("venue", "central")]["action"], "update")
+        self.assertEqual(self.step("apply_draw_venue_updates"), 1)
+        venue = dict(self.db.execute("SELECT address, map_url, notes FROM venues WHERE name='Central Courts'").fetchone())
+        self.assertEqual(venue, {"address": "2 Court Rd", "map_url": "https://maps.example/central", "notes": "Gate 3"})
+
+    def test_recording_outcomes_twice_under_one_run_id_adds_nothing(self):
+        self.db.execute("INSERT INTO venues(id,org_id,name,address,map_url,notes,convenor_phone,created_at) VALUES ('v-manual','a','central courts',NULL,NULL,NULL,NULL,1)")
+        plan = self.plan()
+        outcomes = json.dumps([{"entity_type": r["entity_type"], "source_key": r["source_key"], "action": r["action"], "severity": r["severity"], "message": r["message"], "outcome": r["outcome"]} for r in plan])
+        self.call("record_draw_import_run", source_system="fixture-book", source_run="2026-spring-v1", payload_sha256=fp(json.dumps(self.payload)))
+        self.call("record_draw_import_outcomes", outcomes=outcomes)
+        self.call("record_draw_import_outcomes", outcomes=outcomes)
+        self.assertEqual(self.count("draw_import_records"), len(plan))
+        warned = dict(self.db.execute("SELECT outcome, warning, severity FROM draw_import_records WHERE source_key='central' AND entity_type='venue'").fetchone())
+        self.assertEqual(warned, {"outcome": "skipped", "warning": 1, "severity": "info"})
+
+    def test_recording_actions_are_audited(self):
+        for tool in ("record_draw_import_run", "record_draw_import_outcomes"):
+            with self.subTest(tool=tool):
+                self.assertIs(TOOLS[tool]["contract"]["audit"], True)
+                self.assertIn(tool, TOOLS["record_audit_event"]["params"]["action"]["enum"])
 
 
 if __name__ == "__main__":
