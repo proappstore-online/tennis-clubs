@@ -3,14 +3,20 @@ import { PageHeader } from '@proappstore/sdk'
 import { outcomeOf, recordAudit, type AuditOutcome } from './auditTrail'
 
 type AppClient = { actions: { call<T = unknown>(name: string, values: Record<string, unknown>): Promise<T> }; storage: { uploadForReview(path: string, data: Blob, contentType?: string): Promise<{ key: string }>; downloadForReview(userId: string, path: string): Promise<Response> }; auth: { user: { id: string } | null } }
-type Fixture = { id: string; org_id: string; starts_at: string; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; opponent_name: string | null; is_external_opponent: number | null; in_count: number; out_count: number; pending_count: number }
-type Player = { user_id: string; display_name: string; availability: 'in' | 'out' | 'pending'; updated_at: number | null }
-type Candidate = { user_id: string; display_name: string }
+type Fixture = { id: string; org_id: string; starts_at: string; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; opponent_name: string | null; is_external_opponent: number | null; home_team_id: string; away_team_id: string; in_count: number; out_count: number; pending_count: number }
+type Selection = 'selected' | 'pending' | 'unavailable' | 'emergency_call_up'
+type Player = { user_id: string; display_name: string; availability: 'in' | 'out' | 'pending'; selection: Selection | null; pool: 'regular' | 'emergency' | null; updated_at: number | null }
+type Candidate = { user_id: string; display_name: string; pool?: 'regular' | 'emergency' | null }
+type SquadMember = { team_id: string; user_id: string; display_name: string; pool: 'regular' | 'emergency'; is_active: number; updated_at: number | null }
+type SelectionChange = { id: string; user_id: string; display_name: string; old_selection: Selection | null; new_selection: Selection; actor_user_id: string; created_at: number }
 type Activity = { user_id: string; display_name: string; action: string; old_availability: string | null; new_availability: string | null; created_at: number }
 type Result = { id: string; home_score: number; away_score: number; set_results: string | null; scorecard_user_id: string | null; scorecard_path: string | null; submitted_at: number; correction_note: string | null }
 type ResultFixture = { fixture_id: string; card_state: string; home_score: number | null; away_score: number | null; submitted_at: number | null; scorecard_user_id: string | null; scorecard_path: string | null; home_team_name: string; away_team_name: string }
 const field = 'min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]'
 const date = (value: string) => new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(value))
+const selectionLabel = (value: string | null | undefined) => ({ selected: 'Selected', pending: 'Selection pending', unavailable: 'Unavailable', emergency_call_up: 'Emergency call-up' } as Record<string, string>)[value ?? 'selected'] ?? 'Selected'
+const selectionOptionsFor = (pool: string | null | undefined): [Selection, string][] => pool === 'emergency' ? [['emergency_call_up', 'Emergency call-up']] : [['selected', 'Selected'], ['pending', 'Selection pending'], ['unavailable', 'Unavailable']]
+const defaultSelectionFor = (pool: string | null | undefined): Selection => pool === 'emergency' ? 'emergency_call_up' : 'selected'
 const stamp = (value: number | null) => value ? new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value < 1e12 ? value * 1000 : value)) : 'No reply yet'
 
 export default function RosterAdmin({ app }: { app: AppClient }) {
@@ -25,6 +31,9 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [squad, setSquad] = useState<SquadMember[]>([])
+  const [selectionHistory, setSelectionHistory] = useState<SelectionChange[]>([])
+  const [selectionState, setSelectionState] = useState<Selection>('selected')
 
   async function audit(action: string, targetType: string, targetId: string, outcome: AuditOutcome) {
     const orgId = fixtures.find((fixture) => fixture.id === fixtureId)?.org_id
@@ -51,25 +60,35 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
         app.actions.call<{ rows: ResultFixture[] }>('list_managed_fixture_results', {}),
       ])
       setResultHistory(results.rows ?? []); setCardState(status.rows?.find((x) => x.fixture_id === id)?.card_state ?? 'missing')
+      const fixture = fixtures.find((x) => x.id === id)
+      if (fixture) {
+        const [squadResults, history] = await Promise.all([
+          Promise.all([fixture.home_team_id, fixture.away_team_id].map((team) => app.actions.call<{ rows: SquadMember[] }>('list_team_pool', { org_id: fixture.org_id, team_id: team }))),
+          app.actions.call<{ rows: SelectionChange[] }>('list_fixture_selection_history', { org_id: fixture.org_id, fixture_id: id }),
+        ])
+        setSquad(squadResults.flatMap((result) => result.rows ?? [])); setSelectionHistory(history.rows ?? [])
+      }
       setCandidateId((current) => (c.rows ?? []).find((x) => x.user_id === current && !roster.some((p) => p.user_id === current))?.user_id ?? (c.rows ?? []).find((x) => !roster.some((p) => p.user_id === x.user_id))?.user_id ?? '')
     } catch { setError('This fixture roster could not be loaded.') }
   }
   useEffect(() => { void loadFixtures() }, [app])
   useEffect(() => { void loadRoster(fixtureId) }, [fixtureId])
-  async function mutate(action: 'add_fixture_roster_player' | 'remove_fixture_roster_player', userId: string) {
+  async function mutate(action: 'add_fixture_roster_player' | 'remove_fixture_roster_player', userId: string, selection: Selection = 'selected') {
     if (!fixtureId) return
     setBusy(true); setError(''); setMessage('')
     try {
       const previousPlayer = players.find((player) => player.user_id === userId)
-      const result = await app.actions.call(action, { fixture_id: fixtureId, user_id: userId })
+      const values = action === 'add_fixture_roster_player' ? { fixture_id: fixtureId, user_id: userId, selection } : { fixture_id: fixtureId, user_id: userId }
+      const result = await app.actions.call(action, values)
       if (action === 'add_fixture_roster_player') {
-        await app.actions.call('log_fixture_roster_added', { fixture_id: fixtureId, user_id: userId })
+        if (!previousPlayer) await app.actions.call('log_fixture_roster_added', { fixture_id: fixtureId, user_id: userId })
+        await app.actions.call('log_fixture_selection_change', { id: crypto.randomUUID(), org_id: selected?.org_id, fixture_id: fixtureId, user_id: userId, old_selection: previousPlayer?.selection ?? null })
       } else if (previousPlayer) {
         await app.actions.call('log_fixture_roster_removed', { fixture_id: fixtureId, user_id: userId, old_availability: previousPlayer.availability })
       }
       const audited = await audit(action, 'fixture_roster_player', `${fixtureId}:${userId}`, outcomeOf(result))
       await Promise.all([loadRoster(), loadFixtures()])
-      const done = action.startsWith('add') ? 'Player added to the published roster.' : 'Player removed from this fixture roster.'
+      const done = action.startsWith('add') ? (previousPlayer ? 'Selection updated.' : 'Player added to the fixture roster.') : 'Player removed from this fixture roster.'
       setMessage(audited ? done : `${done} The audit record could not be written.`)
     }
     catch {
@@ -77,6 +96,32 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
       setError('The roster change could not be saved.')
     }
     finally { setBusy(false) }
+  }
+  async function changePool(member: SquadMember, pool: 'regular' | 'emergency') {
+    if (!selected || pool === member.pool) return
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const result = await app.actions.call('set_team_player_pool', { org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, pool })
+      await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'pool_set', old_pool: member.pool, new_pool: pool })
+      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'set_team_player_pool', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome: outcomeOf(result) })
+      await loadRoster()
+      setMessage(audited ? `${member.display_name} moved to the ${pool === 'emergency' ? 'emergency' : 'regular'} pool.` : 'Pool updated. The audit record could not be written.')
+    } catch {
+      setError('The squad change could not be saved.')
+    } finally { setBusy(false) }
+  }
+  async function leaveSquad(member: SquadMember) {
+    if (!selected) return
+    setBusy(true); setError(''); setMessage('')
+    try {
+      const result = await app.actions.call('deactivate_team_player', { org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id })
+      await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'deactivated', old_pool: member.pool, new_pool: null })
+      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'deactivate_team_player', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome: outcomeOf(result) })
+      await loadRoster()
+      setMessage(audited ? `${member.display_name} has left the active squad.` : 'Squad updated. The audit record could not be written.')
+    } catch {
+      setError('The squad change could not be saved.')
+    } finally { setBusy(false) }
   }
   async function saveMatchDay(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -136,9 +181,13 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
       {selected && <section className="mt-5 grid grid-cols-3 gap-3"><Count label="In" value={selected.in_count} /><Count label="Out" value={selected.out_count} /><Count label="Pending" value={selected.pending_count} /></section>}
       {selected && <form onSubmit={(event) => void saveMatchDay(event)} className="mt-5 grid gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Match-day update</h2><p className="text-sm text-[var(--muted)]">Record the status and share a short factual notice with team members. Scores already entered are preserved.</p><label className="text-sm font-semibold text-[var(--ink)]">Status<select name="status" defaultValue={selected.status} className={field}>{[['scheduled','Scheduled'],['washout','Washout'],['heat_out','Heat-out'],['forfeit','Forfeit'],['complete','Complete']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="text-sm font-semibold text-[var(--ink)]">Player notice<textarea name="match_notice" maxLength={280} defaultValue={selected.match_notice ?? ''} placeholder="Optional update for players" className={`${field} min-h-20 py-3`} /></label>{selected.status_updated_at && <p className="text-xs text-[var(--muted)]">Last updated {stamp(selected.status_updated_at)}</p>}<button disabled={busy} className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50">Publish update</button><p className="text-xs text-[var(--muted)]">This records match information only. The app does not decide breaches or penalties.</p></form>}
       {selected && <section className="mt-5 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Result and scorecard</h2><p className="mt-1 text-sm text-[var(--muted)]">Card status: <strong className="capitalize">{cardState}</strong>. Scorecard files are uploaded privately for authorised reviewers.</p><form onSubmit={(event) => void saveResult(event)} className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold text-[var(--ink)]">Home score<input name="home_score" type="number" min="0" required defaultValue={selected.home_score ?? ''} className={field} /></label><label className="text-sm font-semibold text-[var(--ink)]">Away score<input name="away_score" type="number" min="0" required defaultValue={selected.away_score ?? ''} className={field} /></label><label className="text-sm font-semibold text-[var(--ink)] sm:col-span-2">Set results (optional JSON)<input name="set_results" placeholder='[{"home":6,"away":4}]' className={field} /></label><label className="text-sm font-semibold text-[var(--ink)] sm:col-span-2">Scorecard PDF or image (optional)<input name="scorecard" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic" className={`${field} py-2`} /></label><label className="text-sm font-semibold text-[var(--ink)] sm:col-span-2">Correction note (if correcting)<input name="correction_note" maxLength={500} placeholder="Explain a correction to a previous result" className={field} /></label><button disabled={busy} className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">Save result submission</button></form>{resultHistory.length > 0 && <div className="mt-5"><h3 className="font-semibold text-[var(--ink)]">Submission history</h3><ol className="mt-2 divide-y divide-[var(--line)]">{resultHistory.map((r) => <li key={r.id} className="py-3 text-sm"><p className="font-semibold text-[var(--ink)]">{r.home_score}–{r.away_score} · {stamp(r.submitted_at)}</p>{r.set_results && <p className="text-[var(--muted)]">Sets: {r.set_results}</p>}{r.correction_note && <p className="text-[var(--muted)]">Correction: {r.correction_note}</p>}<p className="text-xs text-[var(--muted)]">{r.scorecard_path ? <button type="button" onClick={() => void downloadCard(r.scorecard_user_id!, r.scorecard_path!)} className="font-semibold text-[var(--accent)] underline">Download private scorecard</button> : 'No scorecard attached'}</p></li>)}</ol></div>}</section>}
-      <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Publish players</h2><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select aria-label="Player to add" className={field} value={candidateId} onChange={(e) => setCandidateId(e.target.value)}><option value="">Choose a team member</option>{eligible.map((p) => <option key={p.user_id} value={p.user_id}>{p.display_name}</option>)}</select><button disabled={busy || !candidateId} onClick={() => void mutate('add_fixture_roster_player', candidateId)} className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50">Add to roster</button></div>
-        <div className="mt-4 divide-y divide-[var(--line)]">{players.length === 0 ? <p className="py-4 text-sm text-[var(--muted)]">No players published for this fixture yet.</p> : players.map((p) => <div key={p.user_id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold text-[var(--ink)]">{p.display_name}</p><p className="text-sm text-[var(--muted)]">{p.availability === 'pending' ? 'Not sure / pending' : p.availability === 'in' ? 'In' : 'Out'} · Updated {stamp(p.updated_at)}</p></div><button disabled={busy} onClick={() => void mutate('remove_fixture_roster_player', p.user_id)} className="min-h-11 rounded-xl border border-[var(--line)] px-3 text-sm font-semibold text-[var(--danger)]">Remove</button></div>)}</div>
+      <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Squad</h2><p className="mt-1 text-sm text-[var(--muted)]">Regular and emergency players in each team's squad. Being in the squad does not select anyone for this fixture.</p>
+        {selected && [[selected.home_team_id, selected.home_team_name], [selected.away_team_id, selected.away_team_name]].map(([teamId, teamName]) => <div key={teamId} className="mt-4"><h3 className="font-semibold text-[var(--ink)]">{teamName}</h3>{squad.filter((m) => m.team_id === teamId).length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">No squad members recorded for this team yet.</p> : <div className="mt-2 divide-y divide-[var(--line)]">{squad.filter((m) => m.team_id === teamId).map((m) => <div key={`${m.team_id}-${m.user_id}`} className="flex flex-wrap items-center justify-between gap-3 py-2"><div><p className="font-semibold text-[var(--ink)]">{m.display_name}</p><p className="text-sm text-[var(--muted)]">{m.is_active ? (m.pool === 'emergency' ? 'Emergency pool' : 'Regular pool') : 'Left squad'}</p></div>{m.is_active ? <div className="flex flex-wrap gap-2"><select aria-label={`Pool for ${m.display_name}`} className={field} value={m.pool} disabled={busy} onChange={(e) => void changePool(m, e.target.value as 'regular' | 'emergency')}><option value="regular">Regular</option><option value="emergency">Emergency</option></select><button disabled={busy} onClick={() => void leaveSquad(m)} className="min-h-11 rounded-xl border border-[var(--line)] px-3 text-sm font-semibold text-[var(--danger)]">Leave squad</button></div> : null}</div>)}</div>}</div>)}
       </section>
+      <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Select for this fixture</h2><div className="mt-3 flex flex-col gap-2 sm:flex-row"><select aria-label="Player to add" className={field} value={candidateId} onChange={(e) => { setCandidateId(e.target.value); setSelectionState(defaultSelectionFor(eligible.find((x) => x.user_id === e.target.value)?.pool)) }}><option value="">Choose a team member</option>{eligible.map((p) => <option key={p.user_id} value={p.user_id}>{p.display_name}</option>)}</select><select aria-label="Selection state" className={field} value={selectionState} onChange={(e) => setSelectionState(e.target.value as Selection)}>{selectionOptionsFor(eligible.find((x) => x.user_id === candidateId)?.pool).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><button disabled={busy || !candidateId} onClick={() => void mutate('add_fixture_roster_player', candidateId, selectionState)} className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-semibold text-white disabled:opacity-50">Add to roster</button></div>
+        <div className="mt-4 divide-y divide-[var(--line)]">{players.length === 0 ? <p className="py-4 text-sm text-[var(--muted)]">No players published for this fixture yet.</p> : players.map((p) => <div key={p.user_id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold text-[var(--ink)]">{p.display_name}</p><p className="text-sm text-[var(--muted)]">{p.availability === 'pending' ? 'Not sure / pending' : p.availability === 'in' ? 'In' : 'Out'} · Updated {stamp(p.updated_at)}</p><p className="text-xs font-semibold text-[var(--accent-deep)]">{selectionLabel(p.selection)}{p.pool === 'emergency' ? ' · emergency pool' : ''}</p><label className="mt-2 block text-xs font-semibold text-[var(--ink)]">Selection<select aria-label={`Selection for ${p.display_name}`} className={field} value={p.selection ?? 'selected'} disabled={busy} onChange={(e) => void mutate('add_fixture_roster_player', p.user_id, e.target.value as Selection)}>{selectionOptionsFor(p.pool).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div><button disabled={busy} onClick={() => void mutate('remove_fixture_roster_player', p.user_id)} className="min-h-11 rounded-xl border border-[var(--line)] px-3 text-sm font-semibold text-[var(--danger)]">Remove</button></div>)}</div>
+      </section>
+      <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Selection history</h2>{selectionHistory.length ? <ol className="mt-3 divide-y divide-[var(--line)]">{selectionHistory.map((h) => <li key={h.id} className="py-3 text-sm text-[var(--ink)]"><span className="font-semibold">{h.display_name}</span> {h.old_selection ? `${selectionLabel(h.old_selection)} → ${selectionLabel(h.new_selection)}` : `set to ${selectionLabel(h.new_selection)}`} <span className="text-[var(--muted)]">· by {h.actor_user_id === app.auth.user?.id ? 'you' : 'a club manager'} · {stamp(h.created_at)}</span></li>)}</ol> : <p className="mt-3 text-sm text-[var(--muted)]">No selection changes recorded.</p>}</section>
       <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Roster activity</h2>{activity.length ? <ol className="mt-3 divide-y divide-[var(--line)]">{activity.map((a, i) => <li key={`${a.created_at}-${i}`} className="py-3 text-sm text-[var(--ink)]"><span className="font-semibold">{a.display_name}</span> {a.action === 'added' ? 'was added' : a.action === 'removed' ? 'was removed' : `changed availability from ${a.old_availability} to ${a.new_availability}`} <span className="text-[var(--muted)]">· {stamp(a.created_at)}</span></li>)}</ol> : <p className="mt-3 text-sm text-[var(--muted)]">No roster changes recorded.</p>}</section>
     </> : <p className="mt-6 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">No fixtures are available to manage.</p>}
   </main>

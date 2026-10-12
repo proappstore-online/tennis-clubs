@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const { authState, mockApp, fixtureState, rosterState, activityState } = vi.hoisted(() => {
   const fixture = {
-    id: 'fixture-local', org_id: 'org-local', starts_at: '2027-03-14T09:00:00+11:00', round_label: 'Round 1',
+    id: 'fixture-local', org_id: 'org-local', home_team_id: 'team-home', away_team_id: 'team-away', starts_at: '2027-03-14T09:00:00+11:00', round_label: 'Round 1',
     status: 'scheduled', status_updated_at: null, match_notice: null, home_score: null,
     away_score: null, home_team_name: 'Northside', away_team_name: 'Lakeside',
     in_count: 1, out_count: 0, pending_count: 1, division_name: 'Juniors',
@@ -73,7 +73,7 @@ describe('fixture roster flows with isolated local fixtures', () => {
     expect(screen.getByText(/Not sure \/ pending · Updated/)).toBeTruthy()
     fireEvent.change(screen.getByRole('combobox', { name: 'Player to add' }), { target: { value: 'player-2' } })
     fireEvent.click(screen.getByRole('button', { name: 'Add to roster' }))
-    await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('add_fixture_roster_player', { fixture_id: 'fixture-local', user_id: 'player-2' }))
+    await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('add_fixture_roster_player', { fixture_id: 'fixture-local', user_id: 'player-2', selection: 'selected' }))
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('log_fixture_roster_added', { fixture_id: 'fixture-local', user_id: 'player-2' }))
   })
 
@@ -84,6 +84,19 @@ describe('fixture roster flows with isolated local fixtures', () => {
     render(<App />)
     expect(await screen.findByText('Your team: Northside')).toBeTruthy()
     expect(screen.getByText('Opponent (external): Rival Club')).toBeTruthy()
+  })
+
+  it('shows the squad separately from the players selected for this fixture', async () => {
+    const base = mockApp.actions.call.getMockImplementation()!
+    mockApp.actions.call.mockImplementation(async (name: string, values: Record<string, unknown>) =>
+      name === 'list_team_pool' && values.team_id === 'team-home'
+        ? { rows: [{ team_id: 'team-home', user_id: 'emer-1', display_name: 'Emma Emergency', pool: 'emergency', is_active: 1, updated_at: null }] }
+        : base(name, values))
+    window.history.replaceState({}, '', '/rosters')
+    render(<App />)
+    expect(await screen.findByText('Emma Emergency')).toBeTruthy()
+    expect(screen.getByText('Emergency pool')).toBeTruthy()
+    expect(screen.getByText('Sam Player')).toBeTruthy()
   })
 
   it('records each managed roster change in the audit trail', async () => {

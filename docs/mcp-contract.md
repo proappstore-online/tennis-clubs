@@ -92,8 +92,8 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `get_my_club_permissions` | query | `admin`, `convenor`, `manager` | self | read-only | no | no | no |
 | `list_managed_fixtures` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
 | `list_managed_fixture_roster` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
-| `list_fixture_team_candidates` | query | `club-manager` | manager | read-only | no | yes | no |
-| `add_fixture_roster_player` | execute | `club-manager` | manager | idempotent | yes | no | no |
+| `list_fixture_team_candidates` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `add_fixture_roster_player` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `log_fixture_roster_added` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
 | `remove_fixture_roster_player` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `log_fixture_roster_removed` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
@@ -116,6 +116,13 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `set_external_club_home_venue` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `list_external_clubs` | query | `club-member` | member | read-only | no | yes | yes |
 | `schedule_fixture` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
+| `set_team_player_pool` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `deactivate_team_player` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `log_team_pool_change` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
+| `log_fixture_selection_change` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
+| `list_team_pool` | query | `admin`, `convenor`, `manager` | member | read-only | no | yes | yes |
+| `list_team_pool_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `list_fixture_selection_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 
 ### `list_my_fixtures`
 
@@ -147,7 +154,7 @@ List the selected fixture's player roster and availability when the caller belon
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `user_id`, `display_name`, `availability`, `confirmed_at`, `updated_at`
+Returns: `user_id`, `display_name`, `availability`, `selection`, `pool`, `confirmed_at`, `updated_at`
 
 ### `set_my_fixture_availability`
 
@@ -503,7 +510,7 @@ List fixtures managed by the caller with roster reply totals
 | `offset` | integer; default 0; min 0 |
 | `status` | string; default null; one of `scheduled`, `washout`, `heat_out`, `forfeit`, `complete` |
 
-Returns: `id`, `org_id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
+Returns: `id`, `org_id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_id`, `away_team_id`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
 
 ### `list_managed_fixture_roster`
 
@@ -518,13 +525,13 @@ List roster and latest change time for a fixture managed by caller
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `user_id`, `display_name`, `availability`, `confirmed_at`, `updated_at`
+Returns: `user_id`, `display_name`, `availability`, `selection`, `pool`, `confirmed_at`, `updated_at`
 
 ### `list_fixture_team_candidates`
 
 List accepted members of either fixture team for roster publishing
 
-- Access: club-manager; roles: none (see access); audience: manager.
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: read-only. Audit: not required.
 
 | Parameter | Constraints |
@@ -533,19 +540,20 @@ List accepted members of either fixture team for roster publishing
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `user_id`, `display_name`
+Returns: `user_id`, `display_name`, `pool`
 
 ### `add_fixture_roster_player`
 
-Publish a team member on a fixture roster
+Select a squad member for a fixture (or change their selection state): regular players may be selected, pending or unavailable; emergency players may only be called up
 
-- Access: club-manager; roles: none (see access); audience: manager.
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: idempotent. Audit: record with `record_audit_event`.
 
 | Parameter | Constraints |
 | --- | --- |
 | `fixture_id` | string |
 | `user_id` | string |
+| `selection` | string; default "selected"; one of `selected`, `pending`, `unavailable`, `emergency_call_up` |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -778,7 +786,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -897,3 +905,119 @@ Schedule a fixture between an internal home team and an internal or external awa
 | `round_label` | string; default null |
 
 Returns: `changes`: rows written; 0 means not applied.
+
+### `set_team_player_pool`
+
+Place an accepted team member in the regular or emergency pool of a team's squad and make them active
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `team_id` | string |
+| `user_id` | string |
+| `pool` | string; one of `regular`, `emergency` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `deactivate_team_player`
+
+Take an accepted team member out of the active squad so they can no longer be selected; team membership and fixture visibility are unchanged
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `team_id` | string |
+| `user_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `log_team_pool_change`
+
+Append a pool or squad change to the team's history with its actor
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: append-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `team_id` | string |
+| `user_id` | string |
+| `display_name` | string; maxLength 120 |
+| `action` | string; one of `pool_set`, `deactivated` |
+| `old_pool` | string; default null; one of `regular`, `emergency` |
+| `new_pool` | string; default null; one of `regular`, `emergency` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `log_fixture_selection_change`
+
+Append a roster selection change to the fixture's history with its actor; call after setting a selection state
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: append-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `fixture_id` | string |
+| `user_id` | string |
+| `old_selection` | string; default null; one of `selected`, `pending`, `unavailable`, `emergency_call_up` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_team_pool`
+
+List a team's squad with each player's pool (regular or emergency) and active state; managers see the whole squad, members see only their own row
+
+- Access: club-manager; roles: admin, convenor, manager; audience: member.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `team_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `team_id`, `user_id`, `display_name`, `pool`, `is_active`, `updated_at`
+
+### `list_team_pool_history`
+
+List pool and squad changes for a team with the actor who made each change, newest first
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `team_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `user_id`, `display_name`, `action`, `old_pool`, `new_pool`, `actor_user_id`, `created_at`
+
+### `list_fixture_selection_history`
+
+List selection state changes for a fixture with the actor who made each change, newest first
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `fixture_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `user_id`, `display_name`, `pool`, `old_selection`, `new_selection`, `actor_user_id`, `created_at`

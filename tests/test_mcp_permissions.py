@@ -50,6 +50,10 @@ MANAGER_WRITES = {
     "upsert_imported_roster_player": {"id": "rp-new", "org_id": "a", "starts_at": "2026-10-11T09:00:00+11:00", "round_label": "R1", "team": "Team A", "opponent": "Team B", "player_name": "Sam", "contact": "0400"},
     "add_fixture_roster_player": {"fixture_id": "fa", "user_id": "play-b"},
     "log_fixture_roster_added": {"fixture_id": "fa", "user_id": "play-b"},
+    "log_fixture_selection_change": {"id": "fsh-new", "org_id": "a", "fixture_id": "fa", "user_id": "play-b", "old_selection": None},
+    "set_team_player_pool": {"org_id": "a", "team_id": "ta", "user_id": "play-b", "pool": "emergency"},
+    "log_team_pool_change": {"id": "tph-new", "org_id": "a", "team_id": "ta", "user_id": "play-b", "display_name": "Player B", "action": "pool_set", "old_pool": "regular", "new_pool": "emergency"},
+    "deactivate_team_player": {"org_id": "a", "team_id": "ta", "user_id": "play-b"},
     "remove_fixture_roster_player": {"fixture_id": "fa", "user_id": "play-a"},
     "update_fixture_match_day": {"fixture_id": "fa", "status": "washout", "match_notice": "Rain"},
     "submit_fixture_result": {"id": "sub-new", "fixture_id": "fa", "home_score": 2, "away_score": 1, "set_results": "", "scorecard_user_id": None, "scorecard_path": None, "correction_note": ""},
@@ -244,7 +248,7 @@ class McpPermissionTests(unittest.TestCase):
             "list_club_teams", "list_club_divisions", "list_club_members", "list_managed_fixtures",
             "list_managed_fixture_roster", "list_fixture_team_candidates", "list_fixture_roster_activity",
             "list_managed_fixture_results", "list_fixture_result_history", "list_import_reports",
-            "list_audit_events", "list_authorised_documents", "list_external_clubs",
+            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history",
         }
         self.assertEqual(sorted(set(TOOLS) - covered), [])
 

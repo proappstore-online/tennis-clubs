@@ -40,7 +40,7 @@
       "name": "list_fixture_roster",
       "description": "List the selected fixture's player roster and availability when the caller belongs to either team",
       "operation": "query",
-      "sql": "SELECT fr.user_id, fr.display_name, fr.availability, fr.confirmed_at, fr.confirmed_at AS updated_at FROM fixture_roster fr WHERE fr.fixture_id = :fixture_id AND EXISTS (SELECT 1 FROM fixtures f JOIN teams h ON h.id=f.home_team_id JOIN teams a ON a.id=f.away_team_id WHERE f.id=fr.fixture_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND (EXISTS (SELECT 1 FROM fixtures f JOIN team_players tp ON tp.team_id IN (f.home_team_id, f.away_team_id) WHERE f.id = :fixture_id AND tp.user_id = :__user_id AND tp.is_active = 1) OR EXISTS (SELECT 1 FROM fixtures f JOIN team_memberships tm ON tm.team_id IN (f.home_team_id, f.away_team_id) WHERE f.id = :fixture_id AND tm.user_id = :__user_id AND tm.accepted_at IS NOT NULL AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY CASE fr.availability WHEN 'in' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, fr.display_name, fr.user_id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT fr.user_id, fr.display_name, fr.availability, fr.selection, fr.pool, fr.confirmed_at, fr.confirmed_at AS updated_at FROM fixture_roster fr WHERE fr.fixture_id = :fixture_id AND EXISTS (SELECT 1 FROM fixtures f JOIN teams h ON h.id=f.home_team_id JOIN teams a ON a.id=f.away_team_id WHERE f.id=fr.fixture_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND (EXISTS (SELECT 1 FROM fixtures f JOIN team_players tp ON tp.team_id IN (f.home_team_id, f.away_team_id) WHERE f.id = :fixture_id AND tp.user_id = :__user_id AND tp.is_active = 1) OR EXISTS (SELECT 1 FROM fixtures f JOIN team_memberships tm ON tm.team_id IN (f.home_team_id, f.away_team_id) WHERE f.id = :fixture_id AND tm.user_id = :__user_id AND tm.accepted_at IS NOT NULL AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY CASE fr.availability WHEN 'in' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, fr.display_name, fr.user_id LIMIT :limit OFFSET :offset",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -838,7 +838,7 @@
       "name": "list_managed_fixtures",
       "description": "List fixtures managed by the caller with roster reply totals",
       "operation": "query",
-      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END AS opponent_name,at.is_external AS is_external_opponent,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,f.home_team_id,f.away_team_id,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END AS opponent_name,at.is_external AS is_external_opponent,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "limit": {
           "type": "integer",
@@ -883,7 +883,7 @@
       "name": "list_managed_fixture_roster",
       "description": "List roster and latest change time for a fixture managed by caller",
       "operation": "query",
-      "sql": "SELECT r.user_id,r.display_name,r.availability,r.confirmed_at,COALESCE((SELECT MAX(a.created_at) FROM fixture_roster_activity a WHERE a.fixture_id=r.fixture_id AND a.user_id=r.user_id),r.confirmed_at) AS updated_at FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY r.display_name, r.user_id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT r.user_id,r.display_name,r.availability,r.selection,r.pool,r.confirmed_at,COALESCE((SELECT MAX(a.created_at) FROM fixture_roster_activity a WHERE a.fixture_id=r.fixture_id AND a.user_id=r.user_id),r.confirmed_at) AS updated_at FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY r.display_name, r.user_id LIMIT :limit OFFSET :offset",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -921,7 +921,7 @@
       "name": "list_fixture_team_candidates",
       "description": "List accepted members of either fixture team for roster publishing",
       "operation": "query",
-      "sql": "SELECT DISTINCT tm.user_id,COALESCE(tm.display_name,cm.display_name) AS display_name FROM fixtures f JOIN team_memberships tm ON tm.team_id IN(f.home_team_id,f.away_team_id) LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND tm.user_id IS NOT NULL AND tm.accepted_at IS NOT NULL AND t.org_id=f.org_id AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','convenor','manager')) ORDER BY display_name, tm.user_id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT DISTINCT tm.user_id,COALESCE(tp.display_name,tm.display_name,cm.display_name) AS display_name,COALESCE(tp.pool,'regular') AS pool FROM fixtures f JOIN team_memberships tm ON tm.team_id IN(f.home_team_id,f.away_team_id) LEFT JOIN team_players tp ON tp.team_id=tm.team_id AND tp.user_id=tm.user_id LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND tm.user_id IS NOT NULL AND tm.accepted_at IS NOT NULL AND t.org_id=f.org_id AND COALESCE(tp.is_active,1)=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY pool, display_name, tm.user_id LIMIT :limit OFFSET :offset",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -942,7 +942,11 @@
       "requires_auth": true,
       "contract": {
         "access": "club-manager",
-        "roles": [],
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
         "audience": "manager",
         "idempotency": "read-only",
         "audit": false,
@@ -953,9 +957,9 @@
     },
     {
       "name": "add_fixture_roster_player",
-      "description": "Publish a team member on a fixture roster",
+      "description": "Select a squad member for a fixture (or change their selection state): regular players may be selected, pending or unavailable; emergency players may only be called up",
       "operation": "execute",
-      "sql": "INSERT INTO fixture_roster(fixture_id,user_id,display_name,availability) SELECT f.id,tm.user_id,COALESCE(tm.display_name,cm.display_name),'pending' FROM fixtures f JOIN team_memberships tm ON tm.user_id=:user_id AND tm.team_id IN(f.home_team_id,f.away_team_id) AND tm.accepted_at IS NOT NULL LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams owned WHERE owned.id=tm.team_id AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id,user_id) DO NOTHING",
+      "sql": "INSERT INTO fixture_roster(fixture_id,user_id,display_name,availability,selection,pool) SELECT f.id,tm.user_id,COALESCE(tp.display_name,tm.display_name,cm.display_name),'pending',:selection,COALESCE(tp.pool,'regular') FROM fixtures f JOIN team_memberships tm ON tm.user_id=:user_id AND tm.team_id IN(f.home_team_id,f.away_team_id) AND tm.accepted_at IS NOT NULL LEFT JOIN team_players tp ON tp.team_id=tm.team_id AND tp.user_id=tm.user_id LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND COALESCE(tp.is_active,1)=1 AND ((COALESCE(tp.pool,'regular')='regular' AND :selection IN ('selected','pending','unavailable')) OR (COALESCE(tp.pool,'regular')='emergency' AND :selection='emergency_call_up')) AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams owned WHERE owned.id=tm.team_id AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id,user_id) DO UPDATE SET selection=excluded.selection, pool=excluded.pool",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -964,12 +968,26 @@
         "user_id": {
           "type": "string",
           "description": "Team member user ID"
+        },
+        "selection": {
+          "type": "string",
+          "default": "selected",
+          "enum": [
+            "selected",
+            "pending",
+            "unavailable",
+            "emergency_call_up"
+          ]
         }
       },
       "requires_auth": true,
       "contract": {
         "access": "club-manager",
-        "roles": [],
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
         "audience": "manager",
         "idempotency": "idempotent",
         "audit": true,
@@ -1511,7 +1529,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1533,9 +1551,11 @@
             "create_team",
             "create_team_invite",
             "create_venue",
+            "deactivate_team_player",
             "remove_fixture_roster_player",
             "schedule_fixture",
             "set_external_club_home_venue",
+            "set_team_player_pool",
             "submit_fixture_result",
             "update_fixture_match_day",
             "update_venue",
@@ -1831,6 +1851,304 @@
         "idempotency": "not-idempotent",
         "audit": true,
         "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "set_team_player_pool",
+      "description": "Place an accepted team member in the regular or emergency pool of a team's squad and make them active",
+      "operation": "execute",
+      "sql": "INSERT INTO team_players (team_id,user_id,display_name,is_active,pool,updated_at,updated_by) SELECT tm.team_id,tm.user_id,COALESCE(tm.display_name,'Player'),1,:pool,:__now,:__user_id FROM team_memberships tm JOIN teams t ON t.id=tm.team_id WHERE tm.team_id=:team_id AND t.org_id=:org_id AND t.is_external=0 AND tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND :pool IN ('regular','emergency') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(team_id,user_id) DO UPDATE SET pool=excluded.pool, is_active=1, updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "pool": {
+          "type": "string",
+          "enum": [
+            "regular",
+            "emergency"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "deactivate_team_player",
+      "description": "Take an accepted team member out of the active squad so they can no longer be selected; team membership and fixture visibility are unchanged",
+      "operation": "execute",
+      "sql": "INSERT INTO team_players (team_id,user_id,display_name,is_active,pool,updated_at,updated_by) SELECT tm.team_id,tm.user_id,COALESCE(tm.display_name,'Player'),0,'regular',:__now,:__user_id FROM team_memberships tm JOIN teams t ON t.id=tm.team_id WHERE tm.team_id=:team_id AND t.org_id=:org_id AND tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(team_id,user_id) DO UPDATE SET is_active=0, updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "log_team_pool_change",
+      "description": "Append a pool or squad change to the team's history with its actor",
+      "operation": "execute",
+      "sql": "INSERT INTO team_pool_history (id,org_id,team_id,user_id,display_name,action,old_pool,new_pool,actor_user_id,created_at) SELECT :id,t.org_id,t.id,:user_id,:display_name,:action,:old_pool,:new_pool,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND t.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "pool_set",
+            "deactivated"
+          ]
+        },
+        "old_pool": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "regular",
+            "emergency"
+          ]
+        },
+        "new_pool": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "regular",
+            "emergency"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "append-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "log_fixture_selection_change",
+      "description": "Append a roster selection change to the fixture's history with its actor; call after setting a selection state",
+      "operation": "execute",
+      "sql": "INSERT INTO fixture_selection_history (id,org_id,fixture_id,user_id,display_name,pool,old_selection,new_selection,actor_user_id,created_at) SELECT :id,f.org_id,r.fixture_id,r.user_id,r.display_name,r.pool,:old_selection,r.selection,:__user_id,:__now FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE r.fixture_id=:fixture_id AND r.user_id=:user_id AND f.org_id=:org_id AND (:old_selection IS NULL OR :old_selection<>r.selection) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "fixture_id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "old_selection": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "selected",
+            "pending",
+            "unavailable",
+            "emergency_call_up"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "append-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_team_pool",
+      "description": "List a team's squad with each player's pool (regular or emergency) and active state; managers see the whole squad, members see only their own row",
+      "operation": "query",
+      "sql": "SELECT tm.team_id,tm.user_id,COALESCE(tp.display_name,tm.display_name) AS display_name,COALESCE(tp.pool,'regular') AS pool,COALESCE(tp.is_active,1) AS is_active,COALESCE(tp.updated_at,tm.accepted_at) AS updated_at FROM team_memberships tm JOIN teams t ON t.id=tm.team_id LEFT JOIN team_players tp ON tp.team_id=tm.team_id AND tp.user_id=tm.user_id WHERE tm.team_id=:team_id AND t.org_id=:org_id AND tm.user_id IS NOT NULL AND tm.accepted_at IS NOT NULL AND (EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) OR tm.user_id=:__user_id) ORDER BY COALESCE(tp.pool,'regular'), display_name, tm.user_id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "member",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_team_pool_history",
+      "description": "List pool and squad changes for a team with the actor who made each change, newest first",
+      "operation": "query",
+      "sql": "SELECT h.id,h.user_id,h.display_name,h.action,h.old_pool,h.new_pool,h.actor_user_id,h.created_at FROM team_pool_history h WHERE h.org_id=:org_id AND h.team_id=:team_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=h.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY h.created_at DESC, h.id DESC LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_fixture_selection_history",
+      "description": "List selection state changes for a fixture with the actor who made each change, newest first",
+      "operation": "query",
+      "sql": "SELECT h.id,h.user_id,h.display_name,h.pool,h.old_selection,h.new_selection,h.actor_user_id,h.created_at FROM fixture_selection_history h WHERE h.org_id=:org_id AND h.fixture_id=:fixture_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=h.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY h.created_at DESC, h.id DESC LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "fixture_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
         "versioned": false,
         "redacts": []
       }

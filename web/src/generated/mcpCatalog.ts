@@ -893,7 +893,11 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     "name": "list_fixture_team_candidates",
     "description": "List accepted members of either fixture team for roster publishing",
     "operation": "query",
-    "roles": [],
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
     "access": "club-manager",
     "audience": "manager",
     "idempotency": "read-only",
@@ -922,9 +926,13 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "add_fixture_roster_player",
-    "description": "Publish a team member on a fixture roster",
+    "description": "Select a squad member for a fixture (or change their selection state): regular players may be selected, pending or unavailable; emergency players may only be called up",
     "operation": "execute",
-    "roles": [],
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
     "access": "club-manager",
     "audience": "manager",
     "idempotency": "idempotent",
@@ -939,6 +947,17 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       {
         "name": "user_id",
         "type": "string"
+      },
+      {
+        "name": "selection",
+        "type": "string",
+        "default": "selected",
+        "enum": [
+          "selected",
+          "pending",
+          "unavailable",
+          "emergency_call_up"
+        ]
       }
     ]
   },
@@ -1482,9 +1501,11 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "create_team",
           "create_team_invite",
           "create_venue",
+          "deactivate_team_player",
           "remove_fixture_roster_player",
           "schedule_fixture",
           "set_external_club_home_venue",
+          "set_team_player_pool",
           "submit_fixture_result",
           "update_fixture_match_day",
           "update_venue",
@@ -1756,6 +1777,300 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "round_label",
         "type": "string",
         "default": null
+      }
+    ]
+  },
+  {
+    "name": "set_team_player_pool",
+    "description": "Place an accepted team member in the regular or emergency pool of a team's squad and make them active",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string"
+      },
+      {
+        "name": "user_id",
+        "type": "string"
+      },
+      {
+        "name": "pool",
+        "type": "string",
+        "enum": [
+          "regular",
+          "emergency"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "deactivate_team_player",
+    "description": "Take an accepted team member out of the active squad so they can no longer be selected; team membership and fixture visibility are unchanged",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string"
+      },
+      {
+        "name": "user_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "log_team_pool_change",
+    "description": "Append a pool or squad change to the team's history with its actor",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "append-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string"
+      },
+      {
+        "name": "user_id",
+        "type": "string"
+      },
+      {
+        "name": "display_name",
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "enum": [
+          "pool_set",
+          "deactivated"
+        ]
+      },
+      {
+        "name": "old_pool",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "regular",
+          "emergency"
+        ]
+      },
+      {
+        "name": "new_pool",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "regular",
+          "emergency"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "log_fixture_selection_change",
+    "description": "Append a roster selection change to the fixture's history with its actor; call after setting a selection state",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "append-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "fixture_id",
+        "type": "string"
+      },
+      {
+        "name": "user_id",
+        "type": "string"
+      },
+      {
+        "name": "old_selection",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "selected",
+          "pending",
+          "unavailable",
+          "emergency_call_up"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "list_team_pool",
+    "description": "List a team's squad with each player's pool (regular or emergency) and active state; managers see the whole squad, members see only their own row",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "member",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_team_pool_history",
+    "description": "List pool and squad changes for a team with the actor who made each change, newest first",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_fixture_selection_history",
+    "description": "List selection state changes for a fixture with the actor who made each change, newest first",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "fixture_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   }
