@@ -117,6 +117,7 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `log_fixture_roster_removed` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
 | `list_fixture_roster_activity` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `update_venue` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `set_venue_shared` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `update_fixture_match_day` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `submit_fixture_result` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
 | `apply_fixture_result_to_fixture` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
@@ -252,7 +253,7 @@ List internal teams, venues and external opponent clubs (placeholder team id, ca
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`, `aliases`
+Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`, `aliases`, `shared`
 
 ### `upsert_imported_fixture`
 
@@ -383,7 +384,7 @@ List venue records for managers; contact details are never part of a venue recor
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `org_id`, `name`, `address`, `map_url`, `notes`, `updated_at`
+Returns: `id`, `org_id`, `name`, `address`, `map_url`, `notes`, `shared`, `updated_at`
 
 ### `list_club_teams`
 
@@ -693,6 +694,21 @@ Update a reusable venue and its travel details; only club managers may edit it
 
 Returns: `changes`: rows written; 0 means not applied.
 
+### `set_venue_shared`
+
+Share or unshare a venue owned by this club. A shared venue can be used for fixtures and imports by any club; only its owning club can change it, and its contact details are never shared
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `venue_id` | string |
+| `org_id` | string |
+| `shared` | integer; min 0; max 1 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
 ### `update_fixture_match_day`
 
 Set a fixture match-day status and concise notice as an active club manager, convenor or administrator
@@ -849,7 +865,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |

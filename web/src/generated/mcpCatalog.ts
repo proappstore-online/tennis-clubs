@@ -1155,6 +1155,38 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     ]
   },
   {
+    "name": "set_venue_shared",
+    "description": "Share or unshare a venue owned by this club. A shared venue can be used for fixtures and imports by any club; only its owning club can change it, and its contact details are never shared",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "venue_id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "shared",
+        "type": "integer",
+        "min": 0,
+        "max": 1
+      }
+    ]
+  },
+  {
     "name": "update_fixture_match_day",
     "description": "Set a fixture match-day status and concise notice as an active club manager, convenor or administrator",
     "operation": "execute",
@@ -1578,6 +1610,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "set_contact_detail",
           "set_external_club_home_venue",
           "set_team_player_pool",
+          "set_venue_shared",
           "submit_fixture_result",
           "update_document_details",
           "update_fixture_match_day",

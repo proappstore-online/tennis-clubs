@@ -22,6 +22,18 @@ describe('member fixtures', () => {
     expect(screen.getByText('Your team: Northside')).toBeTruthy()
   })
 
+  it('labels the member team and the opponent separately, marking an external club', async () => {
+    render(<FixtureList app={appReturning({ rows: [fixture({ member_side: 'home', opponent_name: 'Rival Club', is_external_opponent: 1, away_team_name: 'Rival Club' })] })} />)
+    expect(await screen.findByText('Your team: Northside')).toBeTruthy()
+    expect(screen.getByText('Opponent: Rival Club (external club)')).toBeTruthy()
+  })
+
+  it('shows the opponent for an away member without marking an internal team as external', async () => {
+    render(<FixtureList app={appReturning({ rows: [fixture({ member_side: 'away', opponent_name: 'Northside', is_external_opponent: 0 })] })} />)
+    expect(await screen.findByText('Your team: Lakeside')).toBeTruthy()
+    expect(screen.getByText('Opponent: Northside')).toBeTruthy()
+  })
+
   it('shows a loading state until the fixtures arrive', async () => {
     let finish: (value: unknown) => void = () => {}
     const pending = new Promise((resolve) => { finish = resolve })

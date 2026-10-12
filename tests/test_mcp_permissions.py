@@ -44,6 +44,7 @@ MANAGER_WRITES = {
     "create_division": {"id": "d-new", "season_id": "sa", "name": "Div 2", "format": "singles"},
     "create_venue": {"id": "v-new", "org_id": "a", "name": "Hall", "address": "", "map_url": "", "notes": "", "convenor_phone": ""},
     "update_venue": {"venue_id": "va", "org_id": "a", "name": "Courts A2", "address": "", "map_url": "", "notes": "", "convenor_phone": "0400000009"},
+    "set_venue_shared": {"venue_id": "va", "org_id": "a", "shared": 1},
     "set_contact_detail": {"id": "cd-p", "org_id": "a", "subject_type": "venue", "subject_id": "va", "label": "Convenor", "kind": "phone", "value": "0400 000 009"},
     "delete_contact_detail": {"id": "cd-p", "org_id": "a"},
     "create_team": {"id": "t-new", "org_id": "a", "division_id": "da", "name": "Team E", "colour": ""},

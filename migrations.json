@@ -75,6 +75,10 @@
     {
       "name": "0016_fixture_review_status",
       "sql": "ALTER TABLE fixtures ADD COLUMN review_status TEXT CHECK(review_status IS NULL OR review_status IN ('needs_review','approved','auto_approved')); ALTER TABLE fixtures ADD COLUMN reviewed_by TEXT; ALTER TABLE fixtures ADD COLUMN reviewed_at INTEGER"
+    },
+    {
+      "name": "0017_shared_venues",
+      "sql": "ALTER TABLE venues ADD COLUMN shared INTEGER NOT NULL DEFAULT 0 CHECK(shared IN (0,1))"
     }
   ]
 }

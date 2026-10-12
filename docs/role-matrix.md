@@ -29,6 +29,7 @@ Platform owner or support override: not implemented. If one is added it must be 
 | --- | --- | --- | --- | --- | --- | --- |
 | Club setup | Read seasons, divisions, teams, venues, members | Yes | Yes | Yes | No | No |
 | Club setup | Create season, division, team, venue; update venue | Yes | Yes | Yes | No | No |
+| Club setup | Share a venue with other clubs (owning club only; other clubs can schedule at it but cannot edit it or see its contacts) | Yes | Yes | Yes | No | No |
 | Membership | Create team invite (`create_team_invite`) | Yes | Yes | Yes | No | No |
 | Membership | Change club role or deactivate a member | No tool exists | No tool exists | No tool exists | No | No |
 | Fixtures | Read own team fixtures (`list_my_fixtures`) | Via team row | Via team row | Via team row | Yes (team) | Yes (team, if rowed) |
