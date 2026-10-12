@@ -53,6 +53,11 @@ class McpContractTests(unittest.TestCase):
                     self.assertIn("convenor", tool["contract"]["roles"])
                     self.assertIn("manager", tool["contract"]["roles"])
 
+    def test_no_action_sql_contains_a_semicolon(self):
+        for name, tool in TOOLS.items():
+            with self.subTest(action=name):
+                self.assertNotIn(";", tool["sql"])
+
     def test_idempotency_matches_statement_shape(self):
         for name, tool in TOOLS.items():
             sql = tool["sql"]
