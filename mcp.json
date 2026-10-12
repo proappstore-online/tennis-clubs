@@ -4,7 +4,7 @@
       "name": "list_my_fixtures",
       "description": "List upcoming fixtures for teams the authenticated caller has joined",
       "operation": "query",
-      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN f.home_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'home' WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'away' END AS member_side,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.name ELSE CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END END AS opponent_name,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.is_external ELSE at.is_external END AS is_external_opponent,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,v.notes AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.time_status,f.arrival_at,f.round_label,f.status,f.status_updated_at,f.match_notice,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN f.home_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'home' WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'away' END AS member_side,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.name ELSE CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END END AS opponent_name,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.is_external ELSE at.is_external END AS is_external_opponent,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,v.notes AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "from": {
           "type": "string"
@@ -168,9 +168,9 @@
     },
     {
       "name": "upsert_imported_fixture",
-      "description": "Create or update a fixture in a club managed by the signed-in user",
+      "description": "Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time",
       "operation": "execute",
-      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND t.is_external = 0 AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now",
+      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at, time_status, arrival_at, source_row, source_date_raw, source_time_raw, source_import_run_id) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now, :time_status, :arrival_at, :source_row, :source_date_raw, :source_time_raw, :import_run_id WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND t.is_external = 0 AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL AND :time_status IN ('confirmed','estimated','tbc') AND (:warning_count = 0 OR EXISTS (SELECT 1 FROM import_issue_resolutions r WHERE r.org_id = :org_id AND r.import_run_id = :import_run_id)) AND NOT EXISTS (SELECT 1 FROM fixtures x WHERE x.org_id = :org_id AND x.round_label = :round_label AND x.home_team_id = :home_team_id AND x.away_team_id = :away_team_id AND x.starts_at <> :starts_at AND substr(x.starts_at,1,10) = substr(:starts_at,1,10)) ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now, time_status = excluded.time_status, arrival_at = COALESCE(excluded.arrival_at, fixtures.arrival_at), source_row = COALESCE(excluded.source_row, fixtures.source_row), source_date_raw = COALESCE(excluded.source_date_raw, fixtures.source_date_raw), source_time_raw = COALESCE(excluded.source_time_raw, fixtures.source_time_raw), source_import_run_id = COALESCE(excluded.source_import_run_id, fixtures.source_import_run_id) WHERE (CASE excluded.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) >= (CASE fixtures.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END)",
       "params": {
         "id": {
           "type": "string"
@@ -195,6 +195,41 @@
         },
         "season": {
           "type": "string"
+        },
+        "time_status": {
+          "type": "string",
+          "default": "tbc",
+          "enum": [
+            "confirmed",
+            "estimated",
+            "tbc"
+          ]
+        },
+        "arrival_at": {
+          "type": "string",
+          "default": null
+        },
+        "source_row": {
+          "type": "integer",
+          "default": null,
+          "min": 1
+        },
+        "source_date_raw": {
+          "type": "string",
+          "default": null
+        },
+        "source_time_raw": {
+          "type": "string",
+          "default": null
+        },
+        "import_run_id": {
+          "type": "string",
+          "default": null
+        },
+        "warning_count": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
         }
       },
       "requires_auth": true,
@@ -838,7 +873,7 @@
       "name": "list_managed_fixtures",
       "description": "List fixtures managed by the caller with roster reply totals",
       "operation": "query",
-      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,f.home_team_id,f.away_team_id,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END AS opponent_name,at.is_external AS is_external_opponent,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.time_status,f.arrival_at,f.source_row,f.source_date_raw,f.source_time_raw,f.source_import_run_id,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,f.home_team_id,f.away_team_id,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END AS opponent_name,at.is_external AS is_external_opponent,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "limit": {
           "type": "integer",
@@ -1391,7 +1426,7 @@
       "name": "list_import_reports",
       "description": "List fixture and roster import runs recorded for a club, newest first",
       "operation": "query",
-      "sql": "SELECT r.id,r.org_id,r.kind,r.actor_user_id,r.received_count,r.saved_count,r.rejected_count,r.status,r.created_at,r.created_at AS updated_at FROM import_runs r WHERE r.org_id=:org_id AND (:kind IS NULL OR r.kind=:kind) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=r.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY r.created_at DESC, r.id DESC LIMIT :limit OFFSET :offset",
+      "sql": "SELECT r.id,r.org_id,r.kind,r.actor_user_id,r.received_count,r.saved_count,r.rejected_count,r.status,r.source_sha256,r.blocking_count,r.warning_count,r.acknowledged_count,r.created_at,r.created_at AS updated_at FROM import_runs r WHERE r.org_id=:org_id AND (:kind IS NULL OR r.kind=:kind) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=r.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY r.created_at DESC, r.id DESC LIMIT :limit OFFSET :offset",
       "params": {
         "org_id": {
           "type": "string"
@@ -1436,7 +1471,7 @@
       "name": "record_import_run",
       "description": "Record the outcome of a fixture or roster import in the club's import report",
       "operation": "execute",
-      "sql": "INSERT INTO import_runs (id,org_id,actor_user_id,kind,received_count,saved_count,rejected_count,status,created_at) SELECT :id,:org_id,:__user_id,:kind,:received_count,:saved_count,:rejected_count,:status,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO import_runs (id,org_id,actor_user_id,kind,received_count,saved_count,rejected_count,status,created_at,source_sha256,blocking_count,warning_count,acknowledged_count) SELECT :id,:org_id,:__user_id,:kind,:received_count,:saved_count,:rejected_count,:status,:__now,:source_sha256,:blocking_count,:warning_count,:acknowledged_count WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1470,6 +1505,25 @@
             "saved",
             "rejected"
           ]
+        },
+        "source_sha256": {
+          "type": "string",
+          "default": null
+        },
+        "blocking_count": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        },
+        "warning_count": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        },
+        "acknowledged_count": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
         }
       },
       "requires_auth": true,
@@ -1529,7 +1583,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'reconcile_imported_fixture_time', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1552,6 +1606,7 @@
             "create_team_invite",
             "create_venue",
             "deactivate_team_player",
+            "reconcile_imported_fixture_time",
             "remove_fixture_roster_player",
             "schedule_fixture",
             "set_external_club_home_venue",
@@ -2149,6 +2204,150 @@
         "idempotency": "read-only",
         "audit": false,
         "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "validate_fixture_import",
+      "description": "Dry-run a fixture import: returns every blocking conflict and warning for the source rows (JSON array of raw CSV rows), without writing anything",
+      "operation": "query",
+      "sql": "SELECT v.source_row,v.severity,v.code,v.field,v.message,v.remediation FROM (WITH src AS (SELECT CAST(json_extract(j.value,'$.source_row') AS INTEGER) AS n, trim(COALESCE(json_extract(j.value,'$.date'),'')) AS date_raw, trim(COALESCE(json_extract(j.value,'$.start_time'),'')) AS start_raw, trim(COALESCE(json_extract(j.value,'$.arrival_time'),'')) AS arrival_raw, lower(trim(COALESCE(json_extract(j.value,'$.time_status'),''))) AS status_raw, trim(COALESCE(json_extract(j.value,'$.timezone'),'')) AS tz_raw, trim(COALESCE(json_extract(j.value,'$.round'),'')) AS round_raw, trim(COALESCE(json_extract(j.value,'$.team'),'')) AS team_raw, trim(COALESCE(json_extract(j.value,'$.opponent'),'')) AS opp_raw, lower(trim(COALESCE(json_extract(j.value,'$.home_away'),''))) AS side_raw, trim(COALESCE(json_extract(j.value,'$.venue'),'')) AS venue_raw, trim(COALESCE(json_extract(j.value,'$.season'),'')) AS season_raw FROM json_each(:rows) j), s AS (SELECT src.*, CASE WHEN date_raw GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' AND date(date_raw)=date_raw THEN date_raw WHEN date_raw GLOB '[0-9][0-9]/[0-9][0-9]/[0-9][0-9][0-9][0-9]' AND date(substr(date_raw,7,4)||'-'||substr(date_raw,4,2)||'-'||substr(date_raw,1,2))=(substr(date_raw,7,4)||'-'||substr(date_raw,4,2)||'-'||substr(date_raw,1,2)) THEN substr(date_raw,7,4)||'-'||substr(date_raw,4,2)||'-'||substr(date_raw,1,2) END AS iso, CASE WHEN date_raw GLOB '[0-9][0-9][0-9][0-9]-*' THEN 'iso' WHEN date_raw GLOB '[0-9][0-9]/*' THEN 'dmy' ELSE 'other' END AS fmt, CASE WHEN start_raw GLOB '[0-2][0-9]:[0-5][0-9]' AND substr(start_raw,1,2)<'24' THEN start_raw END AS start_hm, CASE WHEN arrival_raw GLOB '[0-2][0-9]:[0-5][0-9]' AND substr(arrival_raw,1,2)<'24' THEN arrival_raw END AS arrival_hm, CASE WHEN status_raw<>'' THEN status_raw WHEN start_raw<>'' THEN 'confirmed' ELSE 'tbc' END AS eff_status, CASE (CASE WHEN status_raw<>'' THEN status_raw WHEN start_raw<>'' THEN 'confirmed' ELSE 'tbc' END) WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 WHEN 'tbc' THEN 1 ELSE 0 END AS rank_in, lower(team_raw) AS team_l, lower(venue_raw) AS venue_l, trim(replace(replace(replace(lower(opp_raw),'  ',' '),'  ',' '),'  ',' ')) AS opp_n FROM src), m AS (SELECT s.n AS n, (SELECT COUNT(*) FROM teams t WHERE t.org_id=:org_id AND t.is_external=0 AND lower(trim(t.name))=s.team_l) AS team_matches, (SELECT COUNT(*) FROM teams t WHERE t.org_id=:org_id AND t.is_external=0 AND lower(trim(t.name))=s.opp_n) + (SELECT COUNT(*) FROM (SELECT ec.id FROM external_clubs ec WHERE ec.org_id=:org_id AND ec.normalized_name=s.opp_n UNION SELECT a.external_club_id FROM external_club_aliases a WHERE a.org_id=:org_id AND a.normalized_alias=s.opp_n)) AS opp_matches, (SELECT COUNT(*) FROM venues v WHERE v.org_id=:org_id AND lower(trim(v.name))=s.venue_l) AS venue_matches FROM s), e AS (SELECT f.round_label AS round_label, f.starts_at AS starts_at, f.time_status AS time_status, lower(trim(ht.name)) AS home_l, lower(trim(at.name)) AS away_l FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id WHERE f.org_id=:org_id) SELECT s.n AS source_row, 'blocking' AS severity, 'invalid_date' AS code, 'date' AS field, 'Date is not a real yyyy-mm-dd or dd/mm/yyyy calendar date' AS message, 'Use yyyy-mm-dd or dd/mm/yyyy with a real date' AS remediation FROM s WHERE s.iso IS NULL UNION SELECT s.n AS source_row, 'warning' AS severity, 'mixed_date_format' AS code, 'date' AS field, 'This source mixes date formats' AS message, 'Check each date, then accept the warning' AS remediation FROM s WHERE s.fmt IN ('iso','dmy') AND EXISTS (SELECT 1 FROM s t WHERE t.fmt IN ('iso','dmy') AND t.fmt<>s.fmt) UNION SELECT s.n AS source_row, 'blocking' AS severity, 'invalid_time' AS code, 'start_time' AS field, 'Start time must be HH:MM on a 24-hour clock' AS message, 'Enter HH:MM or leave the start time blank' AS remediation FROM s WHERE s.start_raw<>'' AND s.start_hm IS NULL UNION SELECT s.n AS source_row, 'blocking' AS severity, 'invalid_arrival_time' AS code, 'arrival_time' AS field, 'Arrival time must be HH:MM on a 24-hour clock' AS message, 'Enter HH:MM or leave the arrival time blank' AS remediation FROM s WHERE s.arrival_raw<>'' AND s.arrival_hm IS NULL UNION SELECT s.n AS source_row, 'blocking' AS severity, 'invalid_time_status' AS code, 'time_status' AS field, 'Time status must be confirmed, estimated or tbc' AS message, 'Use confirmed, estimated or tbc, or leave it blank' AS remediation FROM s WHERE s.status_raw NOT IN ('','confirmed','estimated','tbc') UNION SELECT s.n AS source_row, 'blocking' AS severity, 'confirmed_without_start' AS code, 'time_status' AS field, 'Start time is marked confirmed but no start time is given' AS message, 'Give the start time or mark it tbc' AS remediation FROM s WHERE s.status_raw='confirmed' AND s.start_raw='' UNION SELECT s.n AS source_row, 'warning' AS severity, 'start_time_missing' AS code, 'start_time' AS field, 'No start time in the source; it will be stored as TBC, not as a confirmed time' AS message, 'Accept as TBC, or add the confirmed start time' AS remediation FROM s WHERE s.start_raw='' UNION SELECT s.n AS source_row, 'warning' AS severity, 'arrival_without_start' AS code, 'arrival_time' AS field, 'Arrival time given without a confirmed start time' AS message, 'Confirm the start time before publishing; arrival is stored separately' AS remediation FROM s WHERE s.arrival_raw<>'' AND s.start_raw='' UNION SELECT s.n AS source_row, 'warning' AS severity, 'estimated_time' AS code, 'time_status' AS field, 'Start time is marked estimated in the source' AS message, 'Accept only if the estimate is acceptable' AS remediation FROM s WHERE s.status_raw='estimated' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'timezone_mismatch' AS code, 'timezone' AS field, 'Source timezone is not Australia/Melbourne' AS message, 'Correct the timezone or convert the times before importing' AS remediation FROM s WHERE s.tz_raw<>'' AND s.tz_raw<>'Australia/Melbourne' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'missing_round' AS code, 'round' AS field, 'Round is required to identify the fixture' AS message, 'Enter the round' AS remediation FROM s WHERE s.round_raw='' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'invalid_home_away' AS code, 'home_away' AS field, 'home_away must be home or away' AS message, 'Use home or away' AS remediation FROM s WHERE s.side_raw NOT IN ('home','away') UNION SELECT s.n AS source_row, 'blocking' AS severity, 'missing_team' AS code, 'team' AS field, 'Team is required' AS message, 'Enter the team name' AS remediation FROM s WHERE s.team_raw='' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'team_not_found' AS code, 'team' AS field, 'Team does not match a team in this club' AS message, 'Correct the team name or create the team first' AS remediation FROM s JOIN m ON m.n=s.n WHERE s.team_raw<>'' AND m.team_matches=0 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'team_ambiguous' AS code, 'team' AS field, 'Team name matches more than one team in this club' AS message, 'Rename one of the teams' AS remediation FROM s JOIN m ON m.n=s.n WHERE m.team_matches>1 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'missing_opponent' AS code, 'opponent' AS field, 'Opponent is required' AS message, 'Enter the opponent name' AS remediation FROM s WHERE s.opp_raw='' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'opponent_not_found' AS code, 'opponent' AS field, 'Opponent matches no team or external club or alias in this club' AS message, 'Add the external club or alias, or correct the name' AS remediation FROM s JOIN m ON m.n=s.n WHERE s.opp_raw<>'' AND m.opp_matches=0 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'opponent_ambiguous' AS code, 'opponent' AS field, 'Opponent name matches more than one club or alias' AS message, 'Resolve the duplicate alias' AS remediation FROM s JOIN m ON m.n=s.n WHERE m.opp_matches>1 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'missing_venue' AS code, 'venue' AS field, 'Venue is required' AS message, 'Enter the venue name' AS remediation FROM s WHERE s.venue_raw='' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'venue_not_found' AS code, 'venue' AS field, 'Venue does not match a venue in this club' AS message, 'Create the venue or correct its name' AS remediation FROM s JOIN m ON m.n=s.n WHERE s.venue_raw<>'' AND m.venue_matches=0 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'venue_ambiguous' AS code, 'venue' AS field, 'Venue name matches more than one venue in this club' AS message, 'Rename one of the venues' AS remediation FROM s JOIN m ON m.n=s.n WHERE m.venue_matches>1 UNION SELECT s.n AS source_row, 'blocking' AS severity, 'missing_season' AS code, 'season' AS field, 'Season is required' AS message, 'Enter the season name' AS remediation FROM s WHERE s.season_raw='' UNION SELECT s.n AS source_row, 'blocking' AS severity, 'season_mismatch' AS code, 'season' AS field, 'Team is not assigned to this season' AS message, 'Check the season or the team division' AS remediation FROM s JOIN m ON m.n=s.n WHERE s.season_raw<>'' AND m.team_matches=1 AND NOT EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id=t.division_id JOIN seasons se ON se.id=d.season_id WHERE t.org_id=:org_id AND t.is_external=0 AND lower(trim(t.name))=s.team_l AND lower(trim(se.name))=lower(s.season_raw)) UNION SELECT a.n AS source_row, 'blocking' AS severity, 'conflicting_date' AS code, 'date' AS field, 'Rows for the same fixture give different dates' AS message, 'Correct the source so every row agrees, then re-check' AS remediation FROM s a JOIN s b ON b.team_l=a.team_l AND b.opp_n=a.opp_n AND b.round_raw=a.round_raw AND b.n<>a.n WHERE COALESCE(b.iso,'')<>COALESCE(a.iso,'') UNION SELECT a.n AS source_row, 'blocking' AS severity, 'conflicting_home_away' AS code, 'home_away' AS field, 'Rows for the same fixture disagree on home or away' AS message, 'Correct the source so every row agrees' AS remediation FROM s a JOIN s b ON b.team_l=a.team_l AND b.opp_n=a.opp_n AND b.round_raw=a.round_raw AND b.n<>a.n WHERE b.side_raw<>a.side_raw UNION SELECT a.n AS source_row, 'blocking' AS severity, 'conflicting_venue' AS code, 'venue' AS field, 'Rows for the same fixture name different venues' AS message, 'Correct the source so every row agrees' AS remediation FROM s a JOIN s b ON b.team_l=a.team_l AND b.opp_n=a.opp_n AND b.round_raw=a.round_raw AND b.n<>a.n WHERE b.venue_l<>a.venue_l UNION SELECT a.n AS source_row, 'blocking' AS severity, 'conflicting_start_time' AS code, 'start_time' AS field, 'Rows for the same fixture disagree on the start time' AS message, 'Correct the source so every row agrees' AS remediation FROM s a JOIN s b ON b.team_l=a.team_l AND b.opp_n=a.opp_n AND b.round_raw=a.round_raw AND b.n<>a.n WHERE COALESCE(b.start_hm,'')<>COALESCE(a.start_hm,'') UNION SELECT a.n AS source_row, 'warning' AS severity, 'duplicate_row' AS code, 'round' AS field, 'This row repeats an earlier row in the source' AS message, 'Remove the duplicate or accept the warning' AS remediation FROM s a WHERE a.iso IS NOT NULL AND EXISTS (SELECT 1 FROM s b WHERE b.n<a.n AND b.team_l=a.team_l AND b.opp_n=a.opp_n AND b.round_raw=a.round_raw AND COALESCE(b.iso,'')=COALESCE(a.iso,'') AND b.venue_l=a.venue_l AND b.side_raw=a.side_raw AND COALESCE(b.start_hm,'')=COALESCE(a.start_hm,'')) UNION SELECT s.n AS source_row, 'warning' AS severity, 'time_downgrade' AS code, 'time_status' AS field, 'This source gives a less certain time than the stored fixture' AS message, 'Keep the stored time, or accept to record the weaker source' AS remediation FROM s JOIN e ON e.round_label=s.round_raw AND substr(e.starts_at,1,10)=s.iso AND ((s.side_raw='home' AND e.home_l=s.team_l AND e.away_l=s.opp_n) OR (s.side_raw='away' AND e.away_l=s.team_l AND e.home_l=s.opp_n)) WHERE s.rank_in < (CASE e.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) UNION SELECT s.n AS source_row, 'warning' AS severity, 'time_change' AS code, 'start_time' AS field, 'This source confirms a different start time from the stored fixture' AS message, 'Accept to replace the stored time, or correct the source' AS remediation FROM s JOIN e ON e.round_label=s.round_raw AND substr(e.starts_at,1,10)=s.iso AND ((s.side_raw='home' AND e.home_l=s.team_l AND e.away_l=s.opp_n) OR (s.side_raw='away' AND e.away_l=s.team_l AND e.home_l=s.opp_n)) WHERE s.eff_status='confirmed' AND e.time_status='confirmed' AND substr(e.starts_at,12,5)<>s.start_hm) v WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY v.source_row, v.code",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "reconcile_imported_fixture_time",
+      "description": "Apply a later source's start time to the same fixture on the same date, only when the new time status is at least as confident as the stored one",
+      "operation": "execute",
+      "sql": "UPDATE fixtures SET starts_at = :starts_at, time_status = :time_status, arrival_at = COALESCE(:arrival_at, arrival_at), source_row = :source_row, source_date_raw = :source_date_raw, source_time_raw = :source_time_raw, source_import_run_id = :import_run_id, updated_at = :__now WHERE org_id = :org_id AND round_label = :round_label AND home_team_id = :home_team_id AND away_team_id = :away_team_id AND substr(starts_at,1,10) = substr(:starts_at,1,10) AND starts_at <> :starts_at AND :time_status IN ('confirmed','estimated','tbc') AND (CASE :time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) >= (CASE time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=fixtures.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "round_label": {
+          "type": "string"
+        },
+        "home_team_id": {
+          "type": "string"
+        },
+        "away_team_id": {
+          "type": "string"
+        },
+        "starts_at": {
+          "type": "string"
+        },
+        "time_status": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "estimated",
+            "tbc"
+          ]
+        },
+        "arrival_at": {
+          "type": "string",
+          "default": null
+        },
+        "source_row": {
+          "type": "integer",
+          "default": null,
+          "min": 1
+        },
+        "source_date_raw": {
+          "type": "string",
+          "default": null
+        },
+        "source_time_raw": {
+          "type": "string",
+          "default": null
+        },
+        "import_run_id": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "record_fixture_import_resolution",
+      "description": "Record that a manager accepted a warning for one source row of an import run; blocking conflicts cannot be recorded",
+      "operation": "execute",
+      "sql": "INSERT INTO import_issue_resolutions (id,org_id,import_run_id,code,source_row,resolution,actor_user_id,created_at) SELECT :id,:org_id,:import_run_id,:code,:source_row,'accepted',:__user_id,:__now WHERE :code IN ('mixed_date_format', 'start_time_missing', 'arrival_without_start', 'estimated_time', 'duplicate_row', 'time_downgrade', 'time_change') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(import_run_id,code,source_row) DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "import_run_id": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "mixed_date_format",
+            "start_time_missing",
+            "arrival_without_start",
+            "estimated_time",
+            "duplicate_row",
+            "time_downgrade",
+            "time_change"
+          ]
+        },
+        "source_row": {
+          "type": "integer",
+          "min": 1
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": false,
+        "paging": false,
         "versioned": false,
         "redacts": []
       }

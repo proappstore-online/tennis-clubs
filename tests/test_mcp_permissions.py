@@ -63,6 +63,8 @@ MANAGER_WRITES = {
     "add_external_club_alias": {"id": "al-new", "org_id": "a", "external_club_id": "ec-new", "alias": "Lakeside"},
     "set_external_club_home_venue": {"org_id": "a", "external_club_id": "ec-new", "venue_id": "va"},
     "schedule_fixture": {"id": "f-sched", "org_id": "a", "division_id": "da", "home_team_id": "ta", "away_team_id": "tx-ec", "venue_id": "va", "starts_at": "2026-12-01T09:00:00+11:00", "round_label": "R9"},
+    "reconcile_imported_fixture_time": {"org_id": "a", "round_label": "R1", "home_team_id": "ta", "away_team_id": "tb", "starts_at": "2026-10-11T15:00:00+11:00", "time_status": "confirmed", "source_row": 2, "import_run_id": "run-p"},
+    "record_fixture_import_resolution": {"id": "res-p", "org_id": "a", "import_run_id": "run-p", "code": "start_time_missing", "source_row": 2},
     "record_import_run": {"id": "imp-new", "org_id": "a", "kind": "fixtures", "received_count": 3, "saved_count": 3, "rejected_count": 0, "status": "saved"},
     "record_audit_event": {"id": "aud-new", "org_id": "a", "action": "update_venue", "target_type": "venue", "target_id": "va", "outcome": "succeeded"},
 }
@@ -248,7 +250,7 @@ class McpPermissionTests(unittest.TestCase):
             "list_club_teams", "list_club_divisions", "list_club_members", "list_managed_fixtures",
             "list_managed_fixture_roster", "list_fixture_team_candidates", "list_fixture_roster_activity",
             "list_managed_fixture_results", "list_fixture_result_history", "list_import_reports",
-            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history",
+            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history", "validate_fixture_import",
         }
         self.assertEqual(sorted(set(TOOLS) - covered), [])
 

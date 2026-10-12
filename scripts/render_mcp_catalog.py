@@ -60,6 +60,8 @@ def bindings(tool):
         values["limit"] = 1
     if "offset" in values:
         values["offset"] = 0
+    if "rows" in values:
+        values["rows"] = "[]"
     return values
 
 

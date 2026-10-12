@@ -46,8 +46,8 @@ class FixtureRosterImportTests(unittest.TestCase):
         script = r"""
           const { melbourneFixtureStart } = await import(`file://${process.env.IMPORT_LOGIC}`);
           process.stdout.write(JSON.stringify([
-            melbourneFixtureStart('2026-06-11'),
-            melbourneFixtureStart('2026-10-11'),
+            melbourneFixtureStart('2026-06-11', '09:00'),
+            melbourneFixtureStart('2026-10-11', '09:00'),
           ]));
         """
         result = subprocess.run(

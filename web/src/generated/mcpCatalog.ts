@@ -172,7 +172,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "upsert_imported_fixture",
-    "description": "Create or update a fixture in a club managed by the signed-in user",
+    "description": "Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time",
     "operation": "execute",
     "roles": [
       "admin",
@@ -217,6 +217,48 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       {
         "name": "season",
         "type": "string"
+      },
+      {
+        "name": "time_status",
+        "type": "string",
+        "default": "tbc",
+        "enum": [
+          "confirmed",
+          "estimated",
+          "tbc"
+        ]
+      },
+      {
+        "name": "arrival_at",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "source_row",
+        "type": "integer",
+        "default": null,
+        "min": 1
+      },
+      {
+        "name": "source_date_raw",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "source_time_raw",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "import_run_id",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "warning_count",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   },
@@ -1424,6 +1466,29 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "saved",
           "rejected"
         ]
+      },
+      {
+        "name": "source_sha256",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "blocking_count",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      },
+      {
+        "name": "warning_count",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      },
+      {
+        "name": "acknowledged_count",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   },
@@ -1502,6 +1567,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "create_team_invite",
           "create_venue",
           "deactivate_team_player",
+          "reconcile_imported_fixture_time",
           "remove_fixture_roster_player",
           "schedule_fixture",
           "set_external_club_home_venue",
@@ -2071,6 +2137,153 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "type": "integer",
         "default": 0,
         "min": 0
+      }
+    ]
+  },
+  {
+    "name": "validate_fixture_import",
+    "description": "Dry-run a fixture import: returns every blocking conflict and warning for the source rows (JSON array of raw CSV rows), without writing anything",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "rows",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "reconcile_imported_fixture_time",
+    "description": "Apply a later source's start time to the same fixture on the same date, only when the new time status is at least as confident as the stored one",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "round_label",
+        "type": "string"
+      },
+      {
+        "name": "home_team_id",
+        "type": "string"
+      },
+      {
+        "name": "away_team_id",
+        "type": "string"
+      },
+      {
+        "name": "starts_at",
+        "type": "string"
+      },
+      {
+        "name": "time_status",
+        "type": "string",
+        "enum": [
+          "confirmed",
+          "estimated",
+          "tbc"
+        ]
+      },
+      {
+        "name": "arrival_at",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "source_row",
+        "type": "integer",
+        "default": null,
+        "min": 1
+      },
+      {
+        "name": "source_date_raw",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "source_time_raw",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "import_run_id",
+        "type": "string",
+        "default": null
+      }
+    ]
+  },
+  {
+    "name": "record_fixture_import_resolution",
+    "description": "Record that a manager accepted a warning for one source row of an import run; blocking conflicts cannot be recorded",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      },
+      {
+        "name": "code",
+        "type": "string",
+        "enum": [
+          "mixed_date_format",
+          "start_time_missing",
+          "arrival_without_start",
+          "estimated_time",
+          "duplicate_row",
+          "time_downgrade",
+          "time_change"
+        ]
+      },
+      {
+        "name": "source_row",
+        "type": "integer",
+        "min": 1
       }
     ]
   }

@@ -123,6 +123,9 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_team_pool` | query | `admin`, `convenor`, `manager` | member | read-only | no | yes | yes |
 | `list_team_pool_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_fixture_selection_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `validate_fixture_import` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
+| `reconcile_imported_fixture_time` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `record_fixture_import_resolution` | execute | `admin`, `convenor`, `manager` | manager | idempotent | no | no | no |
 
 ### `list_my_fixtures`
 
@@ -138,7 +141,7 @@ List upcoming fixtures for teams the authenticated caller has joined
 | `limit` | integer; default 20; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
+Returns: `id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
 
 ### `list_fixture_roster`
 
@@ -201,7 +204,7 @@ Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`, `aliases`
 
 ### `upsert_imported_fixture`
 
-Create or update a fixture in a club managed by the signed-in user
+Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: idempotent. Audit: record with `record_audit_event`.
@@ -216,6 +219,13 @@ Create or update a fixture in a club managed by the signed-in user
 | `starts_at` | string |
 | `round_label` | string |
 | `season` | string |
+| `time_status` | string; default "tbc"; one of `confirmed`, `estimated`, `tbc` |
+| `arrival_at` | string; default null |
+| `source_row` | integer; default null; min 1 |
+| `source_date_raw` | string; default null |
+| `source_time_raw` | string; default null |
+| `import_run_id` | string; default null |
+| `warning_count` | integer; default 0; min 0 |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -510,7 +520,7 @@ List fixtures managed by the caller with roster reply totals
 | `offset` | integer; default 0; min 0 |
 | `status` | string; default null; one of `scheduled`, `washout`, `heat_out`, `forfeit`, `complete` |
 
-Returns: `id`, `org_id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_id`, `away_team_id`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
+Returns: `id`, `org_id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `source_row`, `source_date_raw`, `source_time_raw`, `source_import_run_id`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_id`, `away_team_id`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
 
 ### `list_managed_fixture_roster`
 
@@ -739,7 +749,7 @@ List fixture and roster import runs recorded for a club, newest first
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `org_id`, `kind`, `actor_user_id`, `received_count`, `saved_count`, `rejected_count`, `status`, `created_at`, `updated_at`
+Returns: `id`, `org_id`, `kind`, `actor_user_id`, `received_count`, `saved_count`, `rejected_count`, `status`, `source_sha256`, `blocking_count`, `warning_count`, `acknowledged_count`, `created_at`, `updated_at`
 
 ### `record_import_run`
 
@@ -757,6 +767,10 @@ Record the outcome of a fixture or roster import in the club's import report
 | `saved_count` | integer; min 0 |
 | `rejected_count` | integer; default 0; min 0 |
 | `status` | string; one of `saved`, `rejected` |
+| `source_sha256` | string; default null |
+| `blocking_count` | integer; default 0; min 0 |
+| `warning_count` | integer; default 0; min 0 |
+| `acknowledged_count` | integer; default 0; min 0 |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -786,7 +800,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1021,3 +1035,57 @@ List selection state changes for a fixture with the actor who made each change, 
 | `offset` | integer; default 0; min 0 |
 
 Returns: `id`, `user_id`, `display_name`, `pool`, `old_selection`, `new_selection`, `actor_user_id`, `created_at`
+
+### `validate_fixture_import`
+
+Dry-run a fixture import: returns every blocking conflict and warning for the source rows (JSON array of raw CSV rows), without writing anything
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `rows` | string |
+
+Returns: `source_row`, `severity`, `code`, `field`, `message`, `remediation`
+
+### `reconcile_imported_fixture_time`
+
+Apply a later source's start time to the same fixture on the same date, only when the new time status is at least as confident as the stored one
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `round_label` | string |
+| `home_team_id` | string |
+| `away_team_id` | string |
+| `starts_at` | string |
+| `time_status` | string; one of `confirmed`, `estimated`, `tbc` |
+| `arrival_at` | string; default null |
+| `source_row` | integer; default null; min 1 |
+| `source_date_raw` | string; default null |
+| `source_time_raw` | string; default null |
+| `import_run_id` | string; default null |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `record_fixture_import_resolution`
+
+Record that a manager accepted a warning for one source row of an import run; blocking conflicts cannot be recorded
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `import_run_id` | string |
+| `code` | string; one of `mixed_date_format`, `start_time_missing`, `arrival_without_start`, `estimated_time`, `duplicate_row`, `time_downgrade`, `time_change` |
+| `source_row` | integer; min 1 |
+
+Returns: `changes`: rows written; 0 means not applied.
