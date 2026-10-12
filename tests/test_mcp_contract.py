@@ -58,6 +58,13 @@ class McpContractTests(unittest.TestCase):
             with self.subTest(action=name):
                 self.assertNotIn(";", tool["sql"])
 
+    def test_every_colon_name_in_action_sql_is_a_declared_parameter(self):
+        for name, tool in TOOLS.items():
+            declared = set(tool.get("params", {}))
+            for match in re.finditer(r"(?<![:\w]):([A-Za-z_]\w*)", tool["sql"]):
+                with self.subTest(action=name, reference=match.group(1)):
+                    self.assertTrue(match.group(1).startswith("__") or match.group(1) in declared)
+
     def test_no_action_sql_contains_a_platform_rejected_keyword(self):
         forbidden = ["create", "drop", "alter", "pragma", "attach", "detach", "vacuum", "trigger", "savepoint", "begin", "commit", "rollback"]
         for name, tool in TOOLS.items():
