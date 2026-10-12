@@ -6,9 +6,10 @@ import RosterAdmin from './pages/RosterAdmin'
 import FixtureImport from './pages/FixtureImport'
 import FixtureList from './pages/FixtureList'
 import DocumentLibrary from './pages/DocumentLibrary'
+import ImportReview from './pages/ImportReview'
 
 const app = initPro({ appId: 'tennis-clubs' })
-const NAV: NavItem[] = [{ label: 'Comps', href: '/', title: 'Comps — Tennis Clubs' }, { label: 'Fixtures', href: '/fixtures', title: 'Upcoming fixtures — Tennis Clubs' }, { label: 'Import', href: '/fixture-import', title: 'Import fixtures — Tennis Clubs' }, { label: 'Fixture rosters', href: '/rosters', title: 'Fixture rosters — Tennis Clubs' }, { label: 'Documents', href: '/documents', title: 'Documents — Tennis Clubs' }, { label: 'Club setup', href: '/admin', title: 'Club administration — Tennis Clubs' }]
+const NAV: NavItem[] = [{ label: 'Comps', href: '/', title: 'Comps — Tennis Clubs' }, { label: 'Fixtures', href: '/fixtures', title: 'Upcoming fixtures — Tennis Clubs' }, { label: 'Import', href: '/fixture-import', title: 'Import fixtures — Tennis Clubs' }, { label: 'Fixture rosters', href: '/rosters', title: 'Fixture rosters — Tennis Clubs' }, { label: 'Documents', href: '/documents', title: 'Documents — Tennis Clubs' }, { label: 'Import review', href: '/import-review', title: 'Import review — Tennis Clubs' }, { label: 'Club setup', href: '/admin', title: 'Club administration — Tennis Clubs' }]
 type Availability = 'in' | 'out' | 'pending'
 type Fixture = { id: string; starts_at: string; time_status: string | null; arrival_at: string | null; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_team_name: string; away_team_name: string; member_side: 'home' | 'away' | null; opponent_name: string | null; is_external_opponent: number | null; division_name: string | null; venue_name: string | null; venue_address: string | null; map_url: string | null; venue_notes: string | null; my_availability: Availability | null }
 type RosterPlayer = { user_id: string; display_name: string; availability: Availability; selection?: string | null }
@@ -28,7 +29,7 @@ export default function App() {
 
 function AuthenticatedApp({ user, signOut }: { user: { id: string; login: string }; signOut: () => void }) {
   const path = window.location.pathname
-  const page = path === '/admin' ? <ClubAdmin app={app} /> : path === '/fixture-import' ? <FixtureImport app={app} /> : path === '/fixtures' ? <FixtureList app={app} /> : path === '/rosters' ? <RosterAdmin app={app} /> : path === '/documents' ? <DocumentLibrary app={app} /> : path.startsWith('/join/') ? <TeamInviteAcceptance app={app} code={decodeURIComponent(path.slice('/join/'.length))} /> : <Comps user={user} onSignOut={signOut} />
+  const page = path === '/admin' ? <ClubAdmin app={app} /> : path === '/fixture-import' ? <FixtureImport app={app} /> : path === '/fixtures' ? <FixtureList app={app} /> : path === '/rosters' ? <RosterAdmin app={app} /> : path === '/documents' ? <DocumentLibrary app={app} /> : path === '/import-review' ? <ImportReview app={app} /> : path.startsWith('/join/') ? <TeamInviteAcceptance app={app} code={decodeURIComponent(path.slice('/join/'.length))} /> : <Comps user={user} onSignOut={signOut} />
   return <ProShell
     app={app}
     appName="Tennis Clubs"
