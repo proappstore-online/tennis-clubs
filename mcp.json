@@ -4,7 +4,7 @@
       "name": "list_my_fixtures",
       "description": "List upcoming fixtures for teams the authenticated caller has joined",
       "operation": "query",
-      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.time_status,f.arrival_at,f.round_label,f.status,f.status_updated_at,f.match_notice,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN f.home_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'home' WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'away' END AS member_side,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.name ELSE CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END END AS opponent_name,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.is_external ELSE at.is_external END AS is_external_opponent,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,v.notes AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.time_status,f.arrival_at,f.round_label,f.status,f.status_updated_at,CASE WHEN (f.match_notice GLOB '*@*' OR f.match_notice GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE f.match_notice END AS match_notice,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN f.home_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'home' WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'away' END AS member_side,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.name ELSE CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END END AS opponent_name,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.is_external ELSE at.is_external END AS is_external_opponent,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,CASE WHEN (v.notes GLOB '*@*' OR v.notes GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE v.notes END AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "from": {
           "type": "string"
@@ -31,8 +31,8 @@
         "paging": true,
         "versioned": true,
         "redacts": [
-          "convenor_phone",
-          "contact"
+          "contact",
+          "convenor_phone"
         ]
       }
     },
@@ -250,9 +250,9 @@
     },
     {
       "name": "upsert_imported_roster_player",
-      "description": "Store a private roster contact for a fixture in a club managed by the signed-in user",
+      "description": "Add an imported roster player by name; contact details are never accepted here, use set_contact_detail",
       "operation": "execute",
-      "sql": "INSERT INTO roster_players (id, fixture_id, player_name, contact, availability, created_at) SELECT :id, f.id, :player_name, :contact, 'pending', :__now FROM fixtures f JOIN teams ht ON ht.id = f.home_team_id JOIN teams at ON at.id = f.away_team_id WHERE f.org_id = :org_id AND f.starts_at = :starts_at AND f.round_label = :round_label AND ((ht.name = :team AND at.name = :opponent) OR (at.name = :team AND ht.name = :opponent)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = f.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id, player_name) DO UPDATE SET contact = excluded.contact",
+      "sql": "INSERT INTO roster_players (id, fixture_id, player_name, availability, created_at) SELECT :id, f.id, :player_name, 'pending', :__now FROM fixtures f JOIN teams ht ON ht.id = f.home_team_id JOIN teams at ON at.id = f.away_team_id WHERE f.org_id = :org_id AND f.starts_at = :starts_at AND f.round_label = :round_label AND ((ht.name = :team AND at.name = :opponent) OR (at.name = :team AND ht.name = :opponent)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = f.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id, player_name) DO NOTHING",
       "params": {
         "id": {
           "type": "string"
@@ -273,9 +273,6 @@
           "type": "string"
         },
         "player_name": {
-          "type": "string"
-        },
-        "contact": {
           "type": "string"
         }
       },
@@ -444,9 +441,9 @@
     },
     {
       "name": "list_club_venues",
-      "description": "List club administration records for authorised managers",
+      "description": "List venue records for managers; contact details are never part of a venue record and are listed with list_contact_details",
       "operation": "query",
-      "sql": "SELECT id,org_id,name,address,map_url,notes,convenor_phone,COALESCE(updated_at,created_at) AS updated_at FROM venues WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY name, id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT id,org_id,name,address,map_url,notes,COALESCE(updated_at,created_at) AS updated_at FROM venues WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY name, id LIMIT :limit OFFSET :offset",
       "params": {
         "org_id": {
           "type": "string"
@@ -679,7 +676,7 @@
       "name": "create_venue",
       "description": "Create a venue in a club managed by the caller",
       "operation": "execute",
-      "sql": "INSERT INTO venues (id,org_id,name,address,map_url,notes,convenor_phone,created_at) SELECT :id,:org_id,:name,:address,:map_url,:notes,:convenor_phone,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO venues (id,org_id,name,address,map_url,notes,created_at) SELECT :id,:org_id,:name,:address,:map_url,:notes,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -698,10 +695,6 @@
         },
         "notes": {
           "type": "string"
-        },
-        "convenor_phone": {
-          "type": "string",
-          "description": "Private convenor phone number"
         }
       },
       "requires_auth": true,
@@ -1165,7 +1158,7 @@
       "name": "update_venue",
       "description": "Update a reusable venue and its travel details; only club managers may edit it",
       "operation": "execute",
-      "sql": "UPDATE venues SET name=:name,address=:address,map_url=:map_url,notes=:notes,convenor_phone=:convenor_phone,updated_at=:__now WHERE id=:venue_id AND org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=venues.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "UPDATE venues SET name=:name,address=:address,map_url=:map_url,notes=:notes,updated_at=:__now WHERE id=:venue_id AND org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=venues.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "venue_id": {
           "type": "string"
@@ -1184,10 +1177,6 @@
         },
         "notes": {
           "type": "string"
-        },
-        "convenor_phone": {
-          "type": "string",
-          "description": "Private convenor phone number"
         }
       },
       "requires_auth": true,
@@ -1583,7 +1572,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'reconcile_imported_fixture_time', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'reconcile_imported_fixture_time', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1618,9 +1607,11 @@
             "create_team_invite",
             "create_venue",
             "deactivate_team_player",
+            "delete_contact_detail",
             "reconcile_imported_fixture_time",
             "remove_fixture_roster_player",
             "schedule_fixture",
+            "set_contact_detail",
             "set_external_club_home_venue",
             "set_team_player_pool",
             "submit_fixture_result",
@@ -2810,6 +2801,181 @@
         "idempotency": "read-only",
         "audit": false,
         "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "set_contact_detail",
+      "description": "Save a structured contact detail for a team, venue, club or person; visible only to club managers, convenors and admins",
+      "operation": "execute",
+      "sql": "INSERT INTO contact_details (id,org_id,subject_type,subject_id,label,kind,value,created_by,created_at,updated_at) SELECT :id,:org_id,:subject_type,:subject_id,trim(:label),:kind,trim(:value),:__user_id,:__now,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND length(trim(:value)) BETWEEN 1 AND 200 AND length(trim(:label)) BETWEEN 1 AND 60 AND :subject_type IN ('person','team','venue','club') AND :kind IN ('phone','email','postal','other') AND ((:subject_type='club' AND :subject_id=:org_id) OR (:subject_type='venue' AND EXISTS (SELECT 1 FROM venues v WHERE v.id=:subject_id AND v.org_id=:org_id)) OR (:subject_type='team' AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:subject_id AND t.org_id=:org_id AND t.is_external=0)) OR (:subject_type='person' AND (EXISTS (SELECT 1 FROM club_memberships m WHERE m.org_id=:org_id AND m.user_id=:subject_id) OR EXISTS (SELECT 1 FROM roster_players rp JOIN fixtures f ON f.id=rp.fixture_id WHERE rp.id=:subject_id AND f.org_id=:org_id)))) ON CONFLICT(org_id,subject_type,subject_id,kind,label) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "subject_type": {
+          "type": "string",
+          "enum": [
+            "person",
+            "team",
+            "venue",
+            "club"
+          ]
+        },
+        "subject_id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "phone",
+            "email",
+            "postal",
+            "other"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "delete_contact_detail",
+      "description": "Remove a structured contact detail; visible only to club managers, convenors and admins",
+      "operation": "execute",
+      "sql": "DELETE FROM contact_details WHERE id=:id AND org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=contact_details.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_contact_details",
+      "description": "List structured contact details for a club, optionally for one subject; returns values, so only club managers, convenors and admins may call it",
+      "operation": "query",
+      "sql": "SELECT c.id,c.subject_type,c.subject_id,c.label,c.kind,c.value,c.updated_at FROM contact_details c WHERE c.org_id=:org_id AND (:subject_type IS NULL OR c.subject_type=:subject_type) AND (:subject_id IS NULL OR c.subject_id=:subject_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=c.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY c.subject_type, c.label, c.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "subject_type": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "person",
+            "team",
+            "venue",
+            "club"
+          ]
+        },
+        "subject_id": {
+          "type": "string",
+          "default": null
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_contact_note_review",
+      "description": "List venue notes and match notices that look like contact details and are therefore withheld from player views; returns record ids and fields only, never the text",
+      "operation": "query",
+      "sql": "SELECT 'venue' AS subject_type, v.id AS subject_id, 'notes' AS field FROM venues v WHERE v.org_id=:org_id AND (v.notes GLOB '*@*' OR v.notes GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=v.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) UNION SELECT 'fixture', f.id, 'match_notice' FROM fixtures f WHERE f.org_id=:org_id AND (f.match_notice GLOB '*@*' OR f.match_notice GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY subject_type, subject_id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
         "versioned": false,
         "redacts": []
       }

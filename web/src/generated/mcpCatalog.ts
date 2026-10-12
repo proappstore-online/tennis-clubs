@@ -264,7 +264,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "upsert_imported_roster_player",
-    "description": "Store a private roster contact for a fixture in a club managed by the signed-in user",
+    "description": "Add an imported roster player by name; contact details are never accepted here, use set_contact_detail",
     "operation": "execute",
     "roles": [
       "admin",
@@ -304,10 +304,6 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       },
       {
         "name": "player_name",
-        "type": "string"
-      },
-      {
-        "name": "contact",
         "type": "string"
       }
     ]
@@ -445,7 +441,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "list_club_venues",
-    "description": "List club administration records for authorised managers",
+    "description": "List venue records for managers; contact details are never part of a venue record and are listed with list_contact_details",
     "operation": "query",
     "roles": [
       "admin",
@@ -707,10 +703,6 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       },
       {
         "name": "notes",
-        "type": "string"
-      },
-      {
-        "name": "convenor_phone",
         "type": "string"
       }
     ]
@@ -1159,10 +1151,6 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       {
         "name": "notes",
         "type": "string"
-      },
-      {
-        "name": "convenor_phone",
-        "type": "string"
       }
     ]
   },
@@ -1579,9 +1567,11 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "create_team_invite",
           "create_venue",
           "deactivate_team_player",
+          "delete_contact_detail",
           "reconcile_imported_fixture_time",
           "remove_fixture_roster_player",
           "schedule_fixture",
+          "set_contact_detail",
           "set_external_club_home_venue",
           "set_team_player_pool",
           "submit_fixture_result",
@@ -2700,6 +2690,176 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       {
         "name": "import_run_id",
         "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "set_contact_detail",
+    "description": "Save a structured contact detail for a team, venue, club or person; visible only to club managers, convenors and admins",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "subject_type",
+        "type": "string",
+        "enum": [
+          "person",
+          "team",
+          "venue",
+          "club"
+        ]
+      },
+      {
+        "name": "subject_id",
+        "type": "string"
+      },
+      {
+        "name": "label",
+        "type": "string"
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "enum": [
+          "phone",
+          "email",
+          "postal",
+          "other"
+        ]
+      },
+      {
+        "name": "value",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "delete_contact_detail",
+    "description": "Remove a structured contact detail; visible only to club managers, convenors and admins",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_contact_details",
+    "description": "List structured contact details for a club, optionally for one subject; returns values, so only club managers, convenors and admins may call it",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "subject_type",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "person",
+          "team",
+          "venue",
+          "club"
+        ]
+      },
+      {
+        "name": "subject_id",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_contact_note_review",
+    "description": "List venue notes and match notices that look like contact details and are therefore withheld from player views; returns record ids and fields only, never the text",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   }

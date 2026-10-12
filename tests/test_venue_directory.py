@@ -41,14 +41,14 @@ class VenueDirectoryTests(unittest.TestCase):
 
     def test_player_fixture_projection_includes_travel_notes_but_not_private_phone(self):
         sql = TOOLS['list_my_fixtures']['sql']
-        self.assertIn('v.notes AS venue_notes', sql)
+        self.assertIn('AS venue_notes', sql)
         self.assertNotIn('convenor_phone', sql)
         self.assertNotIn('phone', sql.lower())
 
-    def test_manager_venue_directory_includes_private_convenor_phone(self):
+    def test_venue_records_carry_no_contact_details(self):
         row = self.call('list_club_venues', org_id='a').fetchone()
-        self.assertEqual(row['convenor_phone'], '0400000000')
-        self.assertIn('convenor_phone', TOOLS['create_venue']['sql'])
+        self.assertNotIn('convenor_phone', row.keys())
+        self.assertNotIn('convenor_phone', TOOLS['create_venue']['sql'] + TOOLS['update_venue']['sql'])
 
 
 if __name__ == '__main__':

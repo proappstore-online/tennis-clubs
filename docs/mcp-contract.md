@@ -66,6 +66,8 @@ Atomicity: the platform runs one SQL statement per action, so the steps are not 
 
 ## Redaction
 
+Contact details (phone, email, postal, other) are stored structurally in `contact_details`, with a subject of person, team, venue or club. Only club managers, convenors and administrators can read or change them (`list_contact_details`, `set_contact_detail`, `delete_contact_detail`); no other audience receives a contact value from any action, export or document, and audit records carry the target id only. Venue records hold public access details only. Free-form venue notes and match notices that look like contact details are withheld from player views; `list_contact_note_review` lists those records for a manager to move into contact details, without returning their text. Legacy venue phones and roster contacts were copied into `contact_details` by migration 0014, and no action reads the legacy columns.
+
 Fields withheld from an audience are listed per action. Player-facing reads never select convenor phone numbers, roster contact details, scorecard storage keys, or submitter identities. Document metadata is limited to presence, scores and timestamps; storage keys are never returned by `list_authorised_documents`.
 
 ## Discovery
@@ -152,6 +154,10 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `record_draw_import_outcomes` | execute | `admin` | admin | idempotent | no | no | no |
 | `import_competition_draw` | query | `admin` | admin | read-only | no | no | no |
 | `get_draw_import_report` | query | `admin` | admin | read-only | no | no | no |
+| `set_contact_detail` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `delete_contact_detail` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `list_contact_details` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
+| `list_contact_note_review` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 
 ### `list_my_fixtures`
 
@@ -159,7 +165,7 @@ List upcoming fixtures for teams the authenticated caller has joined
 
 - Access: team-member; roles: none (see access); audience: player.
 - Idempotency: read-only. Audit: not required.
-- Withheld fields: `convenor_phone`, `contact`.
+- Withheld fields: `contact`, `convenor_phone`.
 
 | Parameter | Constraints |
 | --- | --- |
@@ -257,7 +263,7 @@ Returns: `changes`: rows written; 0 means not applied.
 
 ### `upsert_imported_roster_player`
 
-Store a private roster contact for a fixture in a club managed by the signed-in user
+Add an imported roster player by name; contact details are never accepted here, use set_contact_detail
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: idempotent. Audit: record with `record_audit_event`.
@@ -272,7 +278,6 @@ Store a private roster contact for a fixture in a club managed by the signed-in 
 | `team` | string |
 | `opponent` | string |
 | `player_name` | string |
-| `contact` | string |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -347,7 +352,7 @@ Returns: `id`, `org_id`, `name`, `starts_on`, `ends_on`, `status`, `updated_at`
 
 ### `list_club_venues`
 
-List club administration records for authorised managers
+List venue records for managers; contact details are never part of a venue record and are listed with list_contact_details
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: read-only. Audit: not required.
@@ -358,7 +363,7 @@ List club administration records for authorised managers
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `org_id`, `name`, `address`, `map_url`, `notes`, `convenor_phone`, `updated_at`
+Returns: `id`, `org_id`, `name`, `address`, `map_url`, `notes`, `updated_at`
 
 ### `list_club_teams`
 
@@ -455,7 +460,6 @@ Create a venue in a club managed by the caller
 | `address` | string |
 | `map_url` | string |
 | `notes` | string |
-| `convenor_phone` | string |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -666,7 +670,6 @@ Update a reusable venue and its travel details; only club managers may edit it
 | `address` | string |
 | `map_url` | string |
 | `notes` | string |
-| `convenor_phone` | string |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -826,7 +829,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1344,3 +1347,68 @@ Structured report of one competition-draw import run: record counts by outcome (
 | `import_run_id` | string |
 
 Returns: `action`, `severity`, `records`
+
+### `set_contact_detail`
+
+Save a structured contact detail for a team, venue, club or person; visible only to club managers, convenors and admins
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `subject_type` | string; one of `person`, `team`, `venue`, `club` |
+| `subject_id` | string |
+| `label` | string; maxLength 60 |
+| `kind` | string; one of `phone`, `email`, `postal`, `other` |
+| `value` | string; maxLength 200 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `delete_contact_detail`
+
+Remove a structured contact detail; visible only to club managers, convenors and admins
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_contact_details`
+
+List structured contact details for a club, optionally for one subject; returns values, so only club managers, convenors and admins may call it
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `subject_type` | string; default null; one of `person`, `team`, `venue`, `club` |
+| `subject_id` | string; default null |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `subject_type`, `subject_id`, `label`, `kind`, `value`, `updated_at`
+
+### `list_contact_note_review`
+
+List venue notes and match notices that look like contact details and are therefore withheld from player views; returns record ids and fields only, never the text
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `subject_type`, `subject_id`, `field`

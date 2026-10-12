@@ -44,6 +44,8 @@ MANAGER_WRITES = {
     "create_division": {"id": "d-new", "season_id": "sa", "name": "Div 2", "format": "singles"},
     "create_venue": {"id": "v-new", "org_id": "a", "name": "Hall", "address": "", "map_url": "", "notes": "", "convenor_phone": ""},
     "update_venue": {"venue_id": "va", "org_id": "a", "name": "Courts A2", "address": "", "map_url": "", "notes": "", "convenor_phone": "0400000009"},
+    "set_contact_detail": {"id": "cd-p", "org_id": "a", "subject_type": "venue", "subject_id": "va", "label": "Convenor", "kind": "phone", "value": "0400 000 009"},
+    "delete_contact_detail": {"id": "cd-p", "org_id": "a"},
     "create_team": {"id": "t-new", "org_id": "a", "division_id": "da", "name": "Team E", "colour": ""},
     "create_team_invite": {"id": "inv-new", "team_id": "ta", "invite_token": "tok-new"},
     "upsert_imported_fixture": {"id": "f-new", "org_id": "a", "home_team_id": "ta", "away_team_id": "tb", "venue_id": "va", "starts_at": "2026-11-01T09:00:00+11:00", "round_label": "R2", "season": "Season A"},
@@ -177,8 +179,11 @@ class McpPermissionTests(unittest.TestCase):
             self.assertNotIn(private, documents[0])
 
     def test_contact_fields_are_visible_only_to_club_managers(self):
-        self.assertEqual(self.rows("list_club_venues", "conv-a", org_id="a")[0]["convenor_phone"], "0400000001")
-        self.assertEqual(self.rows("list_club_venues", "play-a", org_id="a"), [])
+        self.db.execute("INSERT INTO contact_details(id,org_id,subject_type,subject_id,label,kind,value,created_by,created_at,updated_at) VALUES ('cd-va','a','venue','va','Convenor','phone','0400 000 001','seed',1,1)")
+        self.assertEqual([row["value"] for row in self.rows("list_contact_details", "conv-a", org_id="a")], ["0400 000 001"])
+        self.assertEqual(self.rows("list_contact_details", "play-a", org_id="a"), [])
+        self.assertEqual(self.rows("list_contact_details", "mgr-b", org_id="a"), [])
+        self.assertNotIn("convenor_phone", self.rows("list_club_venues", "conv-a", org_id="a")[0])
         fixture = self.rows("list_my_fixtures", "play-a", **{"from": "2026-01-01"})[0]
         self.assertNotIn("convenor_phone", fixture)
 
@@ -250,7 +255,7 @@ class McpPermissionTests(unittest.TestCase):
             "list_club_teams", "list_club_divisions", "list_club_members", "list_managed_fixtures",
             "list_managed_fixture_roster", "list_fixture_team_candidates", "list_fixture_roster_activity",
             "list_managed_fixture_results", "list_fixture_result_history", "list_import_reports",
-            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history", "validate_fixture_import", "apply_draw_divisions", "apply_draw_external_aliases", "apply_draw_external_clubs", "apply_draw_fixture_updates", "apply_draw_fixtures", "apply_draw_placeholders", "apply_draw_provenance", "apply_draw_roster", "apply_draw_seasons", "apply_draw_teams", "apply_draw_venue_updates", "apply_draw_venues", "get_draw_import_report", "import_competition_draw", "record_draw_import_outcomes", "record_draw_import_run",
+            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history", "validate_fixture_import", "list_contact_details", "list_contact_note_review", "apply_draw_divisions", "apply_draw_external_aliases", "apply_draw_external_clubs", "apply_draw_fixture_updates", "apply_draw_fixtures", "apply_draw_placeholders", "apply_draw_provenance", "apply_draw_roster", "apply_draw_seasons", "apply_draw_teams", "apply_draw_venue_updates", "apply_draw_venues", "get_draw_import_report", "import_competition_draw", "record_draw_import_outcomes", "record_draw_import_run",
         }
         self.assertEqual(sorted(set(TOOLS) - covered), [])
 

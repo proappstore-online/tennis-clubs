@@ -63,6 +63,10 @@
     {
       "name": "0013_draw_import_records",
       "sql": "CREATE TABLE IF NOT EXISTS draw_import_records (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES draw_import_runs(id), org_id TEXT NOT NULL REFERENCES organizations(id), entity_type TEXT NOT NULL, source_key TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('add','adopt','unchanged','update','conflict','error','skipped','failed')), severity TEXT NOT NULL CHECK(severity IN ('info','blocking')), message TEXT NOT NULL, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_draw_import_records_run ON draw_import_records(run_id, action)"
+    },
+    {
+      "name": "0014_contact_details",
+      "sql": "CREATE TABLE IF NOT EXISTS contact_details (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), subject_type TEXT NOT NULL CHECK(subject_type IN ('person','team','venue','club')), subject_id TEXT NOT NULL, label TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('phone','email','postal','other')), value TEXT NOT NULL, created_by TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(org_id, subject_type, subject_id, kind, label)); INSERT INTO contact_details (id, org_id, subject_type, subject_id, label, kind, value, created_by, created_at, updated_at) SELECT 'legacy-venue-' || v.id, v.org_id, 'venue', v.id, 'Convenor', 'phone', trim(v.convenor_phone), 'migration-0014', v.created_at, v.created_at FROM venues v WHERE v.convenor_phone IS NOT NULL AND trim(v.convenor_phone) <> '' ON CONFLICT DO NOTHING; INSERT INTO contact_details (id, org_id, subject_type, subject_id, label, kind, value, created_by, created_at, updated_at) SELECT 'legacy-roster-' || rp.id, f.org_id, 'person', rp.id, rp.player_name, 'other', trim(rp.contact), 'migration-0014', rp.created_at, rp.created_at FROM roster_players rp JOIN fixtures f ON f.id = rp.fixture_id WHERE rp.contact IS NOT NULL AND trim(rp.contact) <> '' ON CONFLICT DO NOTHING"
     }
   ]
 }
