@@ -126,7 +126,8 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
       const inviteId = id()
       const result = await app.actions.call('create_team_invite', { id: inviteId, team_id: teamId, invite_token: token })
       await recordAudit(app, { orgId: clubId, action: 'create_team_invite', targetType: 'team_invite', targetId: inviteId, outcome: outcomeOf(result) })
-      const invite = await app.invites.create({ role: 'player', group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
+      // No PAS role here: club and team membership are created by activate_invited_club_membership and accept_team_invite.
+      const invite = await app.invites.create({ group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
       setInviteLink(invite.link)
       setMessage('PAS team invite created. Share this link with the invited player; the membership is added after redemption.')
       await loadClubData()
@@ -169,7 +170,7 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
           {contacts.length ? <ul className="mt-4 divide-y divide-[var(--line)] text-sm">{contacts.map((contact) => <li key={contact.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><span className="text-[var(--ink)]">{contactSubjectName(contact)} · {contact.label} · {contact.kind}: {contact.value}</span><button onClick={() => void runAction('delete_contact_detail', { id: contact.id, org_id: clubId }, 'Contact detail removed.')} disabled={busy} className="min-h-11 rounded-xl border border-[var(--line)] px-3 font-semibold text-[var(--danger)]">Remove</button></li>)}</ul> : <p className="mt-4 text-sm text-[var(--muted)]">No contact details saved.</p>}
         </section>
         <RecordList title="Teams" rows={teams.map((x) => `${x.name}${x.division_name ? ` · ${x.division_name}` : ''}`)} empty="No teams yet." />
-        <RecordList title="Club managers and administrators" rows={members.filter((x) => ['admin','manager'].includes(x.role)).map((x) => `${x.display_name} · ${x.role}`)} empty="No managers listed." />
+        <RecordList title="Club managers and administrators" rows={members.filter((x) => ['admin', 'convenor', 'manager'].includes(x.role)).map((x) => `${x.display_name} · ${x.role}`)} empty="No managers listed." />
       </section>
     </>}
     <details className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">

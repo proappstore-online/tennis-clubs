@@ -44,7 +44,18 @@ Platform owner or support override: not implemented. If one is added it must be 
 | Contacts | Private venue convenor phone (`list_club_venues`) | Yes | Yes | Yes | No | No |
 | Contacts | Player fixture projection | Venue notes and address only | Same | Same | Same | Same |
 | Contacts | Roster contact details (imported) | Written by import; no read tool | Same | Same | No | No |
+| Contacts | Read and write contact details (`list_contact_details`, `set_contact_detail`, `delete_contact_detail`) | Yes | Yes | Yes | No | No |
 | Imports | Fixture and roster import options and writes | Yes | Yes | Yes | No | No |
+| Imports | Import review screen: latest run counts and fixture provenance (`list_import_reports`, `list_managed_fixtures`) | Yes | Yes | Yes | No | No |
+| Imports | Competition draw import and draw reports (`import_competition_draw`, `apply_draw_*`, `record_draw_import_*`, `get_draw_import_report`) | Yes | No | No | No | No |
+| Documents | Read, `public` visibility (`list_documents`, `check_document_access`) | Yes | Yes | Yes | Yes | Yes |
+| Documents | Read, `member` visibility: active club membership | Yes | Yes | Yes | Yes | Yes |
+| Documents | Read, `team` visibility: active team player or accepted team member, or admin, convenor or manager | Yes | Yes | Yes | Team only | Team only |
+| Documents | Read, `manager` visibility | Yes | Yes | Yes | No | No |
+| Documents | Read, `admin` visibility | Yes | No | No | No | No |
+| Documents | Register, update, change visibility, withdraw, mark stored (`register_document`, `update_document_details`, `change_document_visibility`, `withdraw_document`, `mark_document_stored`) | Yes, any visibility | Yes, not `admin` visibility | Yes, not `admin` visibility | No | No |
+| Documents | Version history and access log (`list_document_history`, `list_document_access_log`) | Yes | Yes | Yes | No | No |
+| Documents | Access attempt (`log_document_access`) | Recorded by the server; outcome is `allowed` only when the caller can see the document, otherwise `denied` | Same | Same | Same | Same |
 
 Notes on the matrix:
 - "Via team row" means the user must have an active `team_players` row or an accepted `team_memberships` row for one of the fixture's teams.
@@ -56,10 +67,11 @@ Notes on the matrix:
 - `activate_invited_club_membership` creates an active club `player` membership in the team's club for the redeeming user. An existing club membership is never changed: an admin stays admin, and an inactive member is not reactivated by an invitation.
 - `accept_team_invite` then claims the team membership. It needs no PAS app role.
 - The client calls them in that order, so a retry after a partial failure is safe.
+- The PAS invite that carries the claim token is created without a `role`. The PAS SDK documents `member` as the default role for an invite, and that default is what redemption assigns on the platform. The app's server never reads PAS roles, so no club or team permission comes from it. The platform's behaviour is not verified by this repository's tests.
 
 ## Known gaps
 
 - No tool changes a member's club role or deactivates a member. Role and activation changes are database-only today.
 - Scorecard file access is enforced by platform storage, which this repository does not configure. Its authorization is unverified here.
 - Roster contact details are stored by import but have no read path.
-- Admin and manager currently have no server-side difference; any future admin-only action needs a separate role check.
+- Admin-only server actions are the competition draw import family and `admin`-visibility documents. Convenor and manager are identical server-side.

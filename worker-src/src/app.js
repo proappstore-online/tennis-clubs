@@ -60,22 +60,23 @@ function userClient(env, invocation, caller) {
   }
 }
 
-async function logAccess(client, orgId, documentId, action, outcome) {
-  await client.call('log_document_access', { id: crypto.randomUUID(), org_id: orgId, document_id: documentId, action, outcome })
+// The server decides the outcome from the caller's visibility; the worker only reports the attempt.
+async function logAccess(client, orgId, documentId, action) {
+  await client.call('log_document_access', { id: crypto.randomUUID(), org_id: orgId, document_id: documentId, action })
 }
 
 async function download(client, orgId, documentId) {
   const found = await client.call('check_document_access', { org_id: orgId, document_id: documentId })
   const document = (found?.rows ?? [])[0]
   if (!document) {
-    await logAccess(client, orgId, documentId, 'download', 'denied')
+    await logAccess(client, orgId, documentId, 'download')
     return plain(404, 'not found')
   }
   const object = await client.storage.get(storageKey(orgId, documentId), client.workerCtx)
   if (!object) return plain(503, 'the file is not available yet')
   const bytes = new Uint8Array(object.body)
   if ((await sha256Hex(bytes)) !== document.sha256) return plain(500, 'the stored file failed its integrity check')
-  await logAccess(client, orgId, documentId, 'download', 'allowed')
+  await logAccess(client, orgId, documentId, 'download')
   return new Response(bytes, {
     status: 200,
     headers: {

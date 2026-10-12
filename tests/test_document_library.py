@@ -162,11 +162,36 @@ class DocumentLibraryTests(unittest.TestCase):
         history = self.rows("list_document_history", "mgr-a", org_id="a", document_id="mem")
         self.assertEqual([(row["action"], row["actor_user_id"]) for row in history], [("visibility_changed", "mgr-a")])
         self.assertEqual(self.rows("list_document_history", "play-a", org_id="a", document_id="mem"), [])
-        self.assertEqual(self.run_action("log_document_access", "play-a", id="x1", org_id="a", document_id="mem", action="download", outcome="allowed").rowcount, 1)
-        self.assertEqual(self.run_action("log_document_access", "par-a", id="x2", org_id="a", document_id="adm", action="download", outcome="denied").rowcount, 1)
+        self.assertEqual(self.run_action("log_document_access", "play-a", id="x1", org_id="a", document_id="tm", action="download").rowcount, 1)
+        self.assertEqual(self.run_action("log_document_access", "par-a", id="x2", org_id="a", document_id="adm", action="download").rowcount, 1)
         log = self.rows("list_document_access_log", "mgr-a", org_id="a", document_id="adm")
         self.assertEqual([(row["actor_user_id"], row["outcome"]) for row in log], [("par-a", "denied")])
-        self.assertEqual(self.rows("list_document_access_log", "play-a", org_id="a", document_id="mem"), [])
+        log = self.rows("list_document_access_log", "mgr-a", org_id="a", document_id="tm")
+        self.assertEqual([(row["actor_user_id"], row["outcome"]) for row in log], [("play-a", "allowed")])
+        self.assertEqual(self.rows("list_document_access_log", "play-a", org_id="a", document_id="tm"), [])
+
+    def test_a_non_member_cannot_forge_an_allowed_access_entry(self):
+        attempts = [("outsider", "mem"), ("inact-a", "mgr"), ("par-a", "mgr"), ("play-a", "adm")]
+        for user, doc_id in attempts:
+            with self.subTest(user=user, document=doc_id):
+                # The outcome parameter is not part of the action; a forged value must be ignored.
+                self.assertEqual(self.run_action("log_document_access", user, id=f"forge-{user}-{doc_id}", org_id="a", document_id=doc_id,
+                                                 action="download", outcome="allowed").rowcount, 1)
+                row = self.db.execute("SELECT outcome FROM document_access_log WHERE id=?", (f"forge-{user}-{doc_id}",)).fetchone()
+                self.assertEqual(row["outcome"], "denied")
+        # A manager of another club may append a denied attempt for a known id, but never an allowed one.
+        self.assertEqual(self.run_action("log_document_access", "mgr-b", id="cross", org_id="a", document_id="mem", action="download").rowcount, 1)
+        self.assertEqual(self.db.execute("SELECT outcome FROM document_access_log WHERE id='cross'").fetchone()["outcome"], "denied")
+
+    def test_access_log_outcome_agrees_with_download_authorisation(self):
+        for doc_id in DOCS:
+            for user in USERS:
+                with self.subTest(document=doc_id, user=user):
+                    granted = bool(self.rows("check_document_access", user, org_id="a", document_id=doc_id))
+                    entry = f"parity-{doc_id}-{user}"
+                    self.run_action("log_document_access", user, id=entry, org_id="a", document_id=doc_id, action="view")
+                    outcome = self.db.execute("SELECT outcome FROM document_access_log WHERE id=?", (entry,)).fetchone()["outcome"]
+                    self.assertEqual(outcome, "allowed" if granted else "denied")
 
     def test_search_category_and_paging_work_within_visibility(self):
         self.register("mgr-a", "handbook", category="behaviour", visibility="member", title="Parent behaviour handbook")

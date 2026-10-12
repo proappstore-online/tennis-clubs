@@ -172,7 +172,7 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `log_document_change` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
 | `list_documents` | query | `admin`, `convenor`, `manager` | member | read-only | no | yes | yes |
 | `check_document_access` | query | `admin`, `convenor`, `manager` | member | read-only | no | no | no |
-| `log_document_access` | execute | `member` | member | append-only | no | no | no |
+| `log_document_access` | execute | `admin`, `convenor`, `manager` | member | append-only | no | no | no |
 | `list_document_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_document_access_log` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_my_clubs` | query | `member` | member | read-only | no | yes | yes |
@@ -1581,9 +1581,9 @@ Returns: `id`, `title`, `content_type`, `byte_size`, `sha256`
 
 ### `log_document_access`
 
-Append a document view or download attempt and its outcome to the access log with the caller as actor
+Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the document, so callers cannot choose the outcome
 
-- Access: member; roles: none (see access); audience: member.
+- Access: member; roles: admin, convenor, manager; audience: member.
 - Idempotency: append-only. Audit: not required.
 
 | Parameter | Constraints |
@@ -1592,7 +1592,6 @@ Append a document view or download attempt and its outcome to the access log wit
 | `org_id` | string |
 | `document_id` | string |
 | `action` | string; one of `view`, `download` |
-| `outcome` | string; one of `allowed`, `denied` |
 
 Returns: `changes`: rows written; 0 means not applied.
 

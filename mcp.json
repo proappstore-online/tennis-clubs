@@ -3425,9 +3425,9 @@
     },
     {
       "name": "log_document_access",
-      "description": "Append a document view or download attempt and its outcome to the access log with the caller as actor",
+      "description": "Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the document, so callers cannot choose the outcome",
       "operation": "execute",
-      "sql": "INSERT INTO document_access_log (id,org_id,document_id,actor_user_id,action,outcome,created_at) SELECT :id,documents.org_id,documents.id,:__user_id,:action,:outcome,:__now FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND :action IN ('view','download') AND :outcome IN ('allowed','denied')",
+      "sql": "INSERT INTO document_access_log (id,org_id,document_id,actor_user_id,action,outcome,created_at) SELECT :id,documents.org_id,documents.id,:__user_id,:action,CASE WHEN (documents.status<>'withdrawn' AND (documents.expires_on IS NULL OR documents.expires_on>=date(:__now/1000,'unixepoch')) AND (documents.visibility='public' OR (documents.visibility='member' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1)) OR (documents.visibility='team' AND ((EXISTS (SELECT 1 FROM team_players tp WHERE tp.team_id=documents.team_id AND tp.user_id=:__user_id AND tp.is_active=1) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.team_id=documents.team_id AND tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL)) OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')))) OR (documents.visibility='manager' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))) OR (documents.visibility='admin' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))))) THEN 'allowed' ELSE 'denied' END,:__now FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND :action IN ('view','download')",
       "params": {
         "id": {
           "type": "string"
@@ -3444,19 +3444,16 @@
             "view",
             "download"
           ]
-        },
-        "outcome": {
-          "type": "string",
-          "enum": [
-            "allowed",
-            "denied"
-          ]
         }
       },
       "requires_auth": true,
       "contract": {
         "access": "member",
-        "roles": [],
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
         "audience": "member",
         "idempotency": "append-only",
         "audit": false,

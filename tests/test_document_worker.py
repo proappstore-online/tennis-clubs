@@ -135,7 +135,7 @@ class DocumentWorkerTests(unittest.TestCase):
         denied = self.results["denied"]
         self.assertEqual(denied["status"], 404)
         self.assertEqual([c["name"] for c in denied["calls"]], ["check_document_access", "log_document_access"])
-        self.assertEqual(denied["calls"][1]["params"]["outcome"], "denied")
+        self.assertNotIn("outcome", denied["calls"][1]["params"])
         self.assertTrue(all(c["as"] == CALLER for c in denied["calls"]))
         self.assertEqual(denied["puts"], [])
 
@@ -147,7 +147,7 @@ class DocumentWorkerTests(unittest.TestCase):
         self.assertEqual(ok["disposition"], 'attachment; filename="Parent guidance"')
         self.assertEqual(ok["cache"], "private, no-store")
         self.assertEqual([c["name"] for c in ok["calls"]], ["check_document_access", "log_document_access"])
-        self.assertEqual(ok["calls"][1]["params"]["outcome"], "allowed")
+        self.assertNotIn("outcome", ok["calls"][1]["params"])
         self.assertEqual(self.results["missing-file"]["status"], 503)
         self.assertEqual(self.results["tampered-file"]["status"], 500)
         self.assertNotIn(b"docs/a", base64.b64decode(ok["body"]))
