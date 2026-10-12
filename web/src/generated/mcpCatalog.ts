@@ -1558,6 +1558,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "apply_draw_venue_updates",
           "apply_draw_venues",
           "apply_fixture_result_to_fixture",
+          "approve_fixture_review",
           "bootstrap_club_admin",
           "change_document_visibility",
           "create_division",
@@ -2243,6 +2244,28 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "import_run_id",
         "type": "string",
         "default": null
+      }
+    ]
+  },
+  {
+    "name": "approve_fixture_review",
+    "description": "Approve an imported fixture whose time needs review (estimated, TBC or not yet classified) so members can see it. Records the approving manager and time on the fixture. Refused for fixtures already approved or confirmed, and for fixtures whose import recorded blocking conflicts",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "fixture_id",
+        "type": "string"
       }
     ]
   },

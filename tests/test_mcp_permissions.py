@@ -72,6 +72,8 @@ MANAGER_WRITES = {
 }
 MANAGER_WRITE_DENIALS_ONLY = {
     "log_fixture_roster_removed": {"fixture_id": "fa", "user_id": "play-x", "old_availability": "pending"},
+    # The seeded fixture is already visible, so only the denial is checked here; approval is tested in test_fixture_review.
+    "approve_fixture_review": {"fixture_id": "fa"},
 }
 
 

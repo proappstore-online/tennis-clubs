@@ -143,6 +143,7 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_fixture_selection_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `validate_fixture_import` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
 | `reconcile_imported_fixture_time` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `approve_fixture_review` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `record_fixture_import_resolution` | execute | `admin`, `convenor`, `manager` | manager | idempotent | no | no | no |
 | `apply_draw_seasons` | execute | `admin` | admin | not-idempotent | yes | no | no |
 | `apply_draw_divisions` | execute | `admin` | admin | not-idempotent | yes | no | no |
@@ -569,7 +570,7 @@ List fixtures managed by the caller with roster reply totals
 | `offset` | integer; default 0; min 0 |
 | `status` | string; default null; one of `scheduled`, `washout`, `heat_out`, `forfeit`, `complete` |
 
-Returns: `id`, `org_id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `source_row`, `source_date_raw`, `source_time_raw`, `source_import_run_id`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_id`, `away_team_id`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
+Returns: `id`, `org_id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `source_row`, `source_date_raw`, `source_time_raw`, `source_import_run_id`, `review_status`, `reviewed_at`, `reviewed_by_name`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_id`, `away_team_id`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
 
 ### `list_managed_fixture_roster`
 
@@ -848,7 +849,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1118,6 +1119,19 @@ Apply a later source's start time to the same fixture on the same date, only whe
 | `source_date_raw` | string; default null |
 | `source_time_raw` | string; default null |
 | `import_run_id` | string; default null |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `approve_fixture_review`
+
+Approve an imported fixture whose time needs review (estimated, TBC or not yet classified) so members can see it. Records the approving manager and time on the fixture. Refused for fixtures already approved or confirmed, and for fixtures whose import recorded blocking conflicts
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `fixture_id` | string |
 
 Returns: `changes`: rows written; 0 means not applied.
 

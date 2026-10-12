@@ -1,5 +1,6 @@
 export type ImportRun = { id: string; org_id: string; kind: 'fixtures' | 'roster'; status: 'saved' | 'rejected'; received_count: number; saved_count: number; rejected_count: number; source_sha256: string | null; blocking_count: number; warning_count: number; acknowledged_count: number; created_at: number }
-export type ManagedFixture = { id: string; org_id: string; starts_at: string; time_status: string | null; arrival_at: string | null; source_row: number | null; source_date_raw: string | null; source_time_raw: string | null; source_import_run_id: string | null; round_label: string | null; status: string; home_team_name: string; away_team_name: string; opponent_name: string | null }
+export type ManagedFixture = { id: string; org_id: string; starts_at: string; time_status: string | null; arrival_at: string | null; source_row: number | null; source_date_raw: string | null; source_time_raw: string | null; source_import_run_id: string | null; round_label: string | null; status: string; home_team_name: string; away_team_name: string; opponent_name: string | null; review_status: ReviewStatus; reviewed_at: number | null; reviewed_by_name: string | null }
+export type ReviewStatus = 'needs_review' | 'approved' | 'auto_approved'
 export type Club = { id: string; name: string; role: string }
 
 const MANAGER_ROLES = ['admin', 'convenor', 'manager']
@@ -22,6 +23,18 @@ export function provenanceRows(fixtures: ManagedFixture[], orgId: string, runId:
 // Estimated and TBC times are not confirmed; members see them with that status.
 export function needsConfirmation(timeStatus: string | null): boolean {
   return timeStatus === 'estimated' || timeStatus === 'tbc'
+}
+
+// The server computes review_status (see mcp.json list_managed_fixtures); a fixture waits for a manager until approved.
+export function awaitingReview(fixture: Pick<ManagedFixture, 'review_status'>): boolean {
+  return fixture.review_status === 'needs_review'
+}
+
+export function approvalLabel(fixture: Pick<ManagedFixture, 'review_status' | 'reviewed_at' | 'reviewed_by_name'>): string {
+  if (fixture.review_status === 'approved' && fixture.reviewed_at !== null) {
+    return `Approved by ${fixture.reviewed_by_name ?? 'a manager'} on ${reportDate(fixture.reviewed_at)}`
+  }
+  return fixture.review_status === 'auto_approved' ? 'Confirmed time, visible to members' : 'Approved'
 }
 
 export function fingerprint(sha256: string | null): string {

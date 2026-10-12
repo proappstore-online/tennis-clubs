@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { fixtureStartLabel } from '../fixtureTime'
-import { fingerprint, latestRun, managerClubs, needsConfirmation, provenanceRows, reportDate, type Club, type ImportRun, type ManagedFixture } from './importReviewLogic'
+import { outcomeOf, recordAudit } from './auditTrail'
+import { approvalLabel, awaitingReview, fingerprint, latestRun, managerClubs, provenanceRows, reportDate, type Club, type ImportRun, type ManagedFixture } from './importReviewLogic'
 
 const kindLabel = (kind: ImportRun['kind']) => (kind === 'fixtures' ? 'Fixture book' : 'Team roster')
 const timeStatusLabel = (status: string | null) => ({ confirmed: 'Confirmed time', estimated: 'Estimated time', tbc: 'Start time TBC' } as Record<string, string>)[status ?? ''] ?? 'Time not recorded'
+type Notice = { tone: 'success' | 'error'; text: string }
 
 export default function ImportReview({ app }: { app: ProAppStore }) {
   const [clubs, setClubs] = useState<Club[] | null>(null)
@@ -13,7 +15,21 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
   const [fixtures, setFixtures] = useState<ManagedFixture[]>([])
   const [loading, setLoading] = useState(true)
   const [runsLoading, setRunsLoading] = useState(false)
+  const [fixturesLoading, setFixturesLoading] = useState(true)
+  const [fixturesReady, setFixturesReady] = useState(false)
+  const [reviewingId, setReviewingId] = useState('')
+  const [notice, setNotice] = useState<Notice | null>(null)
   const [error, setError] = useState('')
+
+  const loadFixtures = useCallback(async () => {
+    setFixturesLoading(true)
+    try {
+      const result = await app.actions.call<{ rows: ManagedFixture[] }>('list_managed_fixtures', { limit: 100 })
+      setFixtures(result.rows ?? [])
+      setFixturesReady(true)
+    } catch { setError('Imported fixtures could not be loaded.') }
+    finally { setFixturesLoading(false) }
+  }, [app])
 
   useEffect(() => {
     let active = true
@@ -26,11 +42,10 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
       })
       .catch(() => { if (active) setError('Your clubs could not be loaded.') })
       .finally(() => { if (active) setLoading(false) })
-    app.actions.call<{ rows: ManagedFixture[] }>('list_managed_fixtures', { limit: 100 })
-      .then((result) => { if (active) setFixtures(result.rows ?? []) })
-      .catch(() => { if (active) setError('Imported fixtures could not be loaded.') })
     return () => { active = false }
   }, [app])
+
+  useEffect(() => { void loadFixtures() }, [loadFixtures])
 
   useEffect(() => {
     if (!clubId) { setRuns([]); return }
@@ -43,10 +58,29 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
     return () => { active = false }
   }, [app, clubId])
 
+  // The approval is one fixture at a time. A refusal is audited too, as the other manager writes are.
+  async function approve(fixture: ManagedFixture) {
+    setReviewingId(fixture.id); setNotice(null)
+    const target = { orgId: fixture.org_id, action: 'approve_fixture_review', targetType: 'fixture', targetId: fixture.id }
+    try {
+      const result = await app.actions.call('approve_fixture_review', { fixture_id: fixture.id })
+      const outcome = outcomeOf(result)
+      const audited = await recordAudit(app, { ...target, outcome })
+      await loadFixtures()
+      if (outcome === 'refused') setNotice({ tone: 'error', text: 'This fixture was not approved. It may already be approved, or its import has blocking conflicts.' })
+      else setNotice(audited ? { tone: 'success', text: 'Fixture approved. Members can now see it.' } : { tone: 'error', text: 'Fixture approved, but the audit record could not be written. Tell an administrator.' })
+    } catch {
+      await recordAudit(app, { ...target, outcome: 'refused' })
+      setNotice({ tone: 'error', text: 'The approval could not be saved. Try again.' })
+    } finally { setReviewingId('') }
+  }
+
   const fixtureRun = latestRun(runs, 'fixtures')
   const rosterRun = latestRun(runs, 'roster')
   const provenance = fixtureRun ? provenanceRows(fixtures, clubId, fixtureRun.id) : []
-  const ambiguous = provenance.filter((fixture) => needsConfirmation(fixture.time_status)).length
+  const waiting = provenance.filter(awaitingReview).length
+  // Empty messages only after a successful load; a failed load is reported by the error alert above.
+  const idle = fixturesReady && !fixturesLoading && !runsLoading
 
   return <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
     <h1 className="display-font text-3xl font-bold text-[var(--ink)]">Import review</h1>
@@ -79,20 +113,29 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
       <a href="/fixture-import" className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-semibold text-[var(--ink)]">Check a file on the Import page</a>
 
       <section className="mt-8">
-        <h2 className="text-xl font-bold text-[var(--ink)]">Source of imported fixtures</h2>
-        {!fixtureRun && !runsLoading && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">No fixtures have been imported for this club yet.</p>}
-        {fixtureRun && provenance.length === 0 && !runsLoading && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">The latest import has no fixtures you can manage.</p>}
-        {provenance.length > 0 && <>
-          <p className="mt-2 text-sm text-[var(--muted)]">{provenance.length} fixtures from the latest fixture book{ambiguous > 0 ? `, ${ambiguous} with an estimated or TBC start time` : ''}.</p>
-          {ambiguous > 0 && <p className="mt-3 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">Approving an ambiguous value before members see it is not available yet: there is no review step in the app. Members already see these fixtures with their estimated or TBC status.</p>}
-          <ul className="mt-4 grid gap-3">{provenance.map((fixture) => <li key={fixture.id} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-bold text-[var(--ink)]">{fixture.home_team_name} <span className="font-medium text-[var(--muted)]">vs</span> {fixture.opponent_name ?? fixture.away_team_name}</h3>
-              {needsConfirmation(fixture.time_status) && <span className="rounded-full bg-[var(--danger)]/10 px-2 py-1 text-xs font-semibold text-[var(--danger)]">Needs confirmation</span>}
-            </div>
-            <p className="mt-1 text-sm text-[var(--muted)]">{fixtureStartLabel(fixture)} · {timeStatusLabel(fixture.time_status)}</p>
-            <p className="mt-2 text-xs text-[var(--muted)]">Source line {fixture.source_row ?? '—'} · Date as imported: {fixture.source_date_raw || '—'} · Start as imported: {fixture.source_time_raw || '—'}{fixture.round_label ? ` · ${fixture.round_label}` : ''}</p>
-          </li>)}</ul>
+        <h2 className="text-xl font-bold text-[var(--ink)]">Review imported fixtures</h2>
+        {fixturesLoading && <p className="mt-2 text-sm text-[var(--muted)]" role="status">Loading fixtures…</p>}
+        {idle && !fixtureRun && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">No fixtures have been imported for this club yet.</p>}
+        {idle && fixtureRun && provenance.length === 0 && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">The latest import has no fixtures you can manage.</p>}
+        {idle && provenance.length > 0 && <>
+          <p className="mt-2 text-sm text-[var(--muted)]">{provenance.length} fixtures from the latest fixture book{waiting > 0 ? `, ${waiting} waiting for review` : ''}.</p>
+          {waiting > 0
+            ? <p className="mt-3 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">Fixtures with an estimated or TBC start time stay hidden from members until a manager approves them. Other fixtures are visible straight away.</p>
+            : <p className="mt-3 text-sm font-semibold text-[var(--mint-deep)]">No fixtures need review.</p>}
+          {notice && <p role={notice.tone === 'error' ? 'alert' : 'status'} className={`mt-3 rounded-xl p-4 text-sm ${notice.tone === 'error' ? 'bg-[var(--danger)]/10 text-[var(--danger)]' : 'bg-[var(--paper-deep)] text-[var(--ink)]'}`}>{notice.text}</p>}
+          <ul className="mt-4 grid gap-3">{provenance.map((fixture) => {
+            const title = `${fixture.home_team_name} vs ${fixture.opponent_name ?? fixture.away_team_name}`
+            return <li key={fixture.id} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-bold text-[var(--ink)]">{fixture.home_team_name} <span className="font-medium text-[var(--muted)]">vs</span> {fixture.opponent_name ?? fixture.away_team_name}</h3>
+                {awaitingReview(fixture) && <span className="rounded-full bg-[var(--danger)]/10 px-2 py-1 text-xs font-semibold text-[var(--danger)]">Needs review</span>}
+              </div>
+              <p className="mt-1 text-sm text-[var(--muted)]">{fixtureStartLabel(fixture)} · {timeStatusLabel(fixture.time_status)}</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--ink)]">{awaitingReview(fixture) ? 'Hidden from members until approved' : approvalLabel(fixture)}</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">Source line {fixture.source_row ?? '—'} · Date as imported: {fixture.source_date_raw || '—'} · Start as imported: {fixture.source_time_raw || '—'}{fixture.round_label ? ` · ${fixture.round_label}` : ''}</p>
+              {awaitingReview(fixture) && <button type="button" aria-label={`Approve ${title}, source line ${fixture.source_row ?? 'unknown'}`} disabled={reviewingId !== ''} onClick={() => void approve(fixture)} className="mt-3 min-h-11 rounded-xl bg-[var(--accent)] px-4 font-semibold text-white disabled:opacity-50">{reviewingId === fixture.id ? 'Approving…' : 'Approve'}</button>}
+            </li>
+          })}</ul>
         </>}
       </section>
     </>}
