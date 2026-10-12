@@ -1559,6 +1559,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "apply_draw_venues",
           "apply_fixture_result_to_fixture",
           "bootstrap_club_admin",
+          "change_document_visibility",
           "create_division",
           "create_external_club",
           "create_external_club_placeholder",
@@ -1568,17 +1569,21 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "create_venue",
           "deactivate_team_player",
           "delete_contact_detail",
+          "mark_document_stored",
           "reconcile_imported_fixture_time",
+          "register_document",
           "remove_fixture_roster_player",
           "schedule_fixture",
           "set_contact_detail",
           "set_external_club_home_venue",
           "set_team_player_pool",
           "submit_fixture_result",
+          "update_document_details",
           "update_fixture_match_day",
           "update_venue",
           "upsert_imported_fixture",
-          "upsert_imported_roster_player"
+          "upsert_imported_roster_player",
+          "withdraw_document"
         ]
       },
       {
@@ -2848,6 +2853,584 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "org_id",
         "type": "string"
       },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "register_document",
+    "description": "Register a club document's metadata (no file bytes); visibility may not exceed the caller's own level, and the file is stored separately",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "scope_type",
+        "type": "string",
+        "enum": [
+          "club",
+          "season",
+          "team",
+          "competition"
+        ]
+      },
+      {
+        "name": "scope_id",
+        "type": "string"
+      },
+      {
+        "name": "team_id",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "enum": [
+          "guidance",
+          "behaviour",
+          "etiquette",
+          "competition",
+          "roster",
+          "other"
+        ]
+      },
+      {
+        "name": "visibility",
+        "type": "string",
+        "enum": [
+          "public",
+          "member",
+          "team",
+          "manager",
+          "admin"
+        ]
+      },
+      {
+        "name": "source_attribution",
+        "type": "string"
+      },
+      {
+        "name": "effective_on",
+        "type": "string"
+      },
+      {
+        "name": "revision",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "expires_on",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "content_type",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "byte_size",
+        "type": "integer",
+        "default": null,
+        "min": 0,
+        "max": 10485760
+      },
+      {
+        "name": "sha256",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "update_document_details",
+    "description": "Update a document's title, description, category, attribution, revision and dates; withdrawn documents and documents above the caller's level cannot be changed",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "name": "description",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "enum": [
+          "guidance",
+          "behaviour",
+          "etiquette",
+          "competition",
+          "roster",
+          "other"
+        ]
+      },
+      {
+        "name": "source_attribution",
+        "type": "string"
+      },
+      {
+        "name": "revision",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "effective_on",
+        "type": "string"
+      },
+      {
+        "name": "expires_on",
+        "type": "string",
+        "default": null
+      }
+    ]
+  },
+  {
+    "name": "change_document_visibility",
+    "description": "Change who can see a document; a manager may set only levels they hold, and admin-only documents change only through an admin",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "visibility",
+        "type": "string",
+        "enum": [
+          "public",
+          "member",
+          "team",
+          "manager",
+          "admin"
+        ]
+      },
+      {
+        "name": "team_id",
+        "type": "string",
+        "default": null
+      }
+    ]
+  },
+  {
+    "name": "withdraw_document",
+    "description": "Withdraw a document so that nobody can list or download it; the record stays for the history",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "mark_document_stored",
+    "description": "Record that a registered document's file has been stored, with its integrity hash, in the app's storage; the storage key is never returned by any list action",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "storage_key",
+        "type": "string"
+      },
+      {
+        "name": "content_type",
+        "type": "string"
+      },
+      {
+        "name": "byte_size",
+        "type": "integer",
+        "min": 0,
+        "max": 10485760
+      },
+      {
+        "name": "sha256",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "log_document_change",
+    "description": "Append a document registration, metadata, visibility, storage or withdrawal event to the document history with its actor",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "append-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "enum": [
+          "registered",
+          "details_updated",
+          "visibility_changed",
+          "stored",
+          "withdrawn"
+        ]
+      },
+      {
+        "name": "old_visibility",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "public",
+          "member",
+          "team",
+          "manager",
+          "admin"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "list_documents",
+    "description": "List the club documents the caller may see (visibility, scope, withdrawal and expiry applied in SQL); never returns storage keys or uploader identities",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "member",
+    "audience": "member",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "guidance",
+          "behaviour",
+          "etiquette",
+          "competition",
+          "roster",
+          "other"
+        ]
+      },
+      {
+        "name": "scope_type",
+        "type": "string",
+        "default": null,
+        "enum": [
+          "club",
+          "season",
+          "team",
+          "competition"
+        ]
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "check_document_access",
+    "description": "Authorise a download: returns the document only when it is stored and visible to the caller; the file is then served by the app's document proxy, which records the access",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "member",
+    "audience": "member",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "log_document_access",
+    "description": "Append a document view or download attempt and its outcome to the access log with the caller as actor",
+    "operation": "execute",
+    "roles": [],
+    "access": "member",
+    "audience": "member",
+    "idempotency": "append-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "enum": [
+          "view",
+          "download"
+        ]
+      },
+      {
+        "name": "outcome",
+        "type": "string",
+        "enum": [
+          "allowed",
+          "denied"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "list_document_history",
+    "description": "List a document's history (registration, detail, visibility, storage and withdrawal events) with the actor for each; managers only",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_document_access_log",
+    "description": "List who viewed or downloaded a document and whether each attempt was allowed; managers only",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_my_clubs",
+    "description": "List the clubs the caller actively belongs to, with the caller's role in each; any club role may read its own memberships",
+    "operation": "query",
+    "roles": [],
+    "access": "member",
+    "audience": "member",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
       {
         "name": "limit",
         "type": "integer",

@@ -64,6 +64,12 @@ Outcomes are `add`, `adopt` (matched an existing record by name and linked it), 
 
 Atomicity: the platform runs one SQL statement per action, so the steps are not a single transaction. Each step is all-or-nothing on its own, and the run is resumable because every step is idempotent. A caller that stops between steps leaves a partial import that the next run completes. Provenance records (`import_provenance`) hold the source system, key, fingerprint and the importer's run id. Contact details are never accepted or stored by this import.
 
+## Document library
+
+Club documents are stored as records in `documents` with title, description, category (guidance, behaviour, etiquette, competition, roster or other), source attribution, effective and revision dates, optional expiry, and a scope of club, season, team or competition. Visibility is one of public (any signed-in user), member (active club members), team (members of the document's team, or managers), manager (managers, convenors and admins) or admin (admins only). `check_document_access` returns a document only when it is stored, not withdrawn, not expired and visible to the caller, using the same rule as `list_documents`, so listing and download authorisation cannot disagree. Registering, changing, withdrawing and storing are manager actions that never let a manager set or change a level above their own. Every change is appended to `document_history` and every view or download attempt to `document_access_log`, both with the actor.
+
+Limit: this repository stores metadata and the authorisation decision only. Serving file bytes needs an app worker proxy (`/.pas/worker/...`) that calls `check_document_access` as the signed-in user and then reads the file from the worker storage namespace; that worker is not deployed here, so no download link is offered yet. Storage keys and uploader identities are never returned by any list action.
+
 ## Redaction
 
 Contact details (phone, email, postal, other) are stored structurally in `contact_details`, with a subject of person, team, venue or club. Only club managers, convenors and administrators can read or change them (`list_contact_details`, `set_contact_detail`, `delete_contact_detail`); no other audience receives a contact value from any action, export or document, and audit records carry the target id only. Venue records hold public access details only. Free-form venue notes and match notices that look like contact details are withheld from player views; `list_contact_note_review` lists those records for a manager to move into contact details, without returning their text. Legacy venue phones and roster contacts were copied into `contact_details` by migration 0014, and no action reads the legacy columns.
@@ -158,6 +164,18 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `delete_contact_detail` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `list_contact_details` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
 | `list_contact_note_review` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `register_document` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
+| `update_document_details` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `change_document_visibility` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `withdraw_document` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `mark_document_stored` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `log_document_change` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
+| `list_documents` | query | `admin`, `convenor`, `manager` | member | read-only | no | yes | yes |
+| `check_document_access` | query | `admin`, `convenor`, `manager` | member | read-only | no | no | no |
+| `log_document_access` | execute | `member` | member | append-only | no | no | no |
+| `list_document_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `list_document_access_log` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
+| `list_my_clubs` | query | `member` | member | read-only | no | yes | yes |
 
 ### `list_my_fixtures`
 
@@ -829,7 +847,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1412,3 +1430,213 @@ List venue notes and match notices that look like contact details and are theref
 | `offset` | integer; default 0; min 0 |
 
 Returns: `subject_type`, `subject_id`, `field`
+
+### `register_document`
+
+Register a club document's metadata (no file bytes); visibility may not exceed the caller's own level, and the file is stored separately
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `scope_type` | string; one of `club`, `season`, `team`, `competition` |
+| `scope_id` | string |
+| `team_id` | string; default null |
+| `title` | string; maxLength 160 |
+| `description` | string; default ""; maxLength 1000 |
+| `category` | string; one of `guidance`, `behaviour`, `etiquette`, `competition`, `roster`, `other` |
+| `visibility` | string; one of `public`, `member`, `team`, `manager`, `admin` |
+| `source_attribution` | string; maxLength 200 |
+| `effective_on` | string |
+| `revision` | string; default null; maxLength 40 |
+| `expires_on` | string; default null |
+| `content_type` | string; default null; maxLength 100 |
+| `byte_size` | integer; default null; min 0; max 10485760 |
+| `sha256` | string; maxLength 64 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `update_document_details`
+
+Update a document's title, description, category, attribution, revision and dates; withdrawn documents and documents above the caller's level cannot be changed
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+| `title` | string; maxLength 160 |
+| `description` | string; default ""; maxLength 1000 |
+| `category` | string; one of `guidance`, `behaviour`, `etiquette`, `competition`, `roster`, `other` |
+| `source_attribution` | string; maxLength 200 |
+| `revision` | string; default null; maxLength 40 |
+| `effective_on` | string |
+| `expires_on` | string; default null |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `change_document_visibility`
+
+Change who can see a document; a manager may set only levels they hold, and admin-only documents change only through an admin
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+| `visibility` | string; one of `public`, `member`, `team`, `manager`, `admin` |
+| `team_id` | string; default null |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `withdraw_document`
+
+Withdraw a document so that nobody can list or download it; the record stays for the history
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `mark_document_stored`
+
+Record that a registered document's file has been stored, with its integrity hash, in the app's storage; the storage key is never returned by any list action
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+| `storage_key` | string; maxLength 200 |
+| `content_type` | string; maxLength 100 |
+| `byte_size` | integer; min 0; max 10485760 |
+| `sha256` | string; maxLength 64 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `log_document_change`
+
+Append a document registration, metadata, visibility, storage or withdrawal event to the document history with its actor
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: append-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `document_id` | string |
+| `action` | string; one of `registered`, `details_updated`, `visibility_changed`, `stored`, `withdrawn` |
+| `old_visibility` | string; default null; one of `public`, `member`, `team`, `manager`, `admin` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_documents`
+
+List the club documents the caller may see (visibility, scope, withdrawal and expiry applied in SQL); never returns storage keys or uploader identities
+
+- Access: member; roles: admin, convenor, manager; audience: member.
+- Idempotency: read-only. Audit: not required.
+- Withheld fields: `uploaded_by`, `storage_key`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `category` | string; default null; one of `guidance`, `behaviour`, `etiquette`, `competition`, `roster`, `other` |
+| `scope_type` | string; default null; one of `club`, `season`, `team`, `competition` |
+| `query` | string; default null; maxLength 80 |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `org_id`, `scope_type`, `scope_id`, `team_id`, `title`, `description`, `category`, `visibility`, `source_attribution`, `effective_on`, `revision`, `expires_on`, `status`, `content_type`, `byte_size`, `sha256`, `updated_at`
+
+### `check_document_access`
+
+Authorise a download: returns the document only when it is stored and visible to the caller; the file is then served by the app's document proxy, which records the access
+
+- Access: member; roles: admin, convenor, manager; audience: member.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+
+Returns: `id`, `title`, `content_type`, `byte_size`, `sha256`
+
+### `log_document_access`
+
+Append a document view or download attempt and its outcome to the access log with the caller as actor
+
+- Access: member; roles: none (see access); audience: member.
+- Idempotency: append-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `document_id` | string |
+| `action` | string; one of `view`, `download` |
+| `outcome` | string; one of `allowed`, `denied` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_document_history`
+
+List a document's history (registration, detail, visibility, storage and withdrawal events) with the actor for each; managers only
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `document_id`, `action`, `old_visibility`, `new_visibility`, `actor_user_id`, `created_at`
+
+### `list_document_access_log`
+
+List who viewed or downloaded a document and whether each attempt was allowed; managers only
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `document_id`, `actor_user_id`, `action`, `outcome`, `created_at`
+
+### `list_my_clubs`
+
+List the clubs the caller actively belongs to, with the caller's role in each; any club role may read its own memberships
+
+- Access: member; roles: none (see access); audience: member.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `name`, `role`, `updated_at`

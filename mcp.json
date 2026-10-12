@@ -1572,7 +1572,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'reconcile_imported_fixture_time', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'register_document', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1599,6 +1599,7 @@
             "apply_draw_venues",
             "apply_fixture_result_to_fixture",
             "bootstrap_club_admin",
+            "change_document_visibility",
             "create_division",
             "create_external_club",
             "create_external_club_placeholder",
@@ -1608,17 +1609,21 @@
             "create_venue",
             "deactivate_team_player",
             "delete_contact_detail",
+            "mark_document_stored",
             "reconcile_imported_fixture_time",
+            "register_document",
             "remove_fixture_roster_player",
             "schedule_fixture",
             "set_contact_detail",
             "set_external_club_home_venue",
             "set_team_player_pool",
             "submit_fixture_result",
+            "update_document_details",
             "update_fixture_match_day",
             "update_venue",
             "upsert_imported_fixture",
-            "upsert_imported_roster_player"
+            "upsert_imported_roster_player",
+            "withdraw_document"
           ]
         },
         "target_type": {
@@ -2977,6 +2982,596 @@
         "audit": false,
         "paging": true,
         "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "register_document",
+      "description": "Register a club document's metadata (no file bytes); visibility may not exceed the caller's own level, and the file is stored separately",
+      "operation": "execute",
+      "sql": "INSERT INTO documents (id,org_id,scope_type,scope_id,team_id,title,description,category,visibility,source_attribution,effective_on,revision,expires_on,status,content_type,byte_size,sha256,uploaded_by,created_at,updated_at) SELECT :id,:org_id,:scope_type,:scope_id,CASE WHEN :visibility='team' THEN :team_id END,trim(:title),:description,:category,:visibility,trim(:source_attribution),:effective_on,:revision,:expires_on,'registered',:content_type,:byte_size,:sha256,:__user_id,:__now,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:visibility IN ('public','member','team','manager','admin') AND (:visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))) AND (:visibility<>'team' OR (:team_id IS NOT NULL AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:team_id AND t.org_id=:org_id AND t.is_external=0)))) AND ((:scope_type='club' AND :scope_id=:org_id) OR (:scope_type='season' AND EXISTS (SELECT 1 FROM seasons s WHERE s.id=:scope_id AND s.org_id=:org_id)) OR (:scope_type='team' AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:scope_id AND t.org_id=:org_id AND t.is_external=0)) OR (:scope_type='competition' AND EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=:scope_id AND s.org_id=:org_id))) AND (:category IN ('guidance','behaviour','etiquette','competition','roster','other')) AND (julianday(:effective_on) IS NOT NULL AND (:expires_on IS NULL OR julianday(:expires_on)>=julianday(:effective_on))) AND (length(:sha256)=64 AND :sha256 NOT GLOB '*[^0-9a-f]*') AND length(trim(:title)) BETWEEN 1 AND 160 AND length(trim(:source_attribution)) BETWEEN 1 AND 200 AND (:byte_size IS NULL OR (:byte_size >= 0 AND :byte_size <= 10485760))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "scope_type": {
+          "type": "string",
+          "enum": [
+            "club",
+            "season",
+            "team",
+            "competition"
+          ]
+        },
+        "scope_id": {
+          "type": "string"
+        },
+        "team_id": {
+          "type": "string",
+          "default": null
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "maxLength": 1000
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "guidance",
+            "behaviour",
+            "etiquette",
+            "competition",
+            "roster",
+            "other"
+          ]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "member",
+            "team",
+            "manager",
+            "admin"
+          ]
+        },
+        "source_attribution": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "effective_on": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string",
+          "default": null,
+          "maxLength": 40
+        },
+        "expires_on": {
+          "type": "string",
+          "default": null
+        },
+        "content_type": {
+          "type": "string",
+          "default": null,
+          "maxLength": 100
+        },
+        "byte_size": {
+          "type": "integer",
+          "default": null,
+          "min": 0,
+          "max": 10485760
+        },
+        "sha256": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "update_document_details",
+      "description": "Update a document's title, description, category, attribution, revision and dates; withdrawn documents and documents above the caller's level cannot be changed",
+      "operation": "execute",
+      "sql": "UPDATE documents SET title=trim(:title),description=:description,category=:category,source_attribution=trim(:source_attribution),revision=:revision,effective_on=:effective_on,expires_on=:expires_on,updated_at=:__now WHERE id=:document_id AND org_id=:org_id AND status<>'withdrawn' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (documents.visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))) AND (:category IN ('guidance','behaviour','etiquette','competition','roster','other')) AND (julianday(:effective_on) IS NOT NULL AND (:expires_on IS NULL OR julianday(:expires_on)>=julianday(:effective_on))) AND length(trim(:title)) BETWEEN 1 AND 160",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "default": "",
+          "maxLength": 1000
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "guidance",
+            "behaviour",
+            "etiquette",
+            "competition",
+            "roster",
+            "other"
+          ]
+        },
+        "source_attribution": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "revision": {
+          "type": "string",
+          "default": null,
+          "maxLength": 40
+        },
+        "effective_on": {
+          "type": "string"
+        },
+        "expires_on": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "change_document_visibility",
+      "description": "Change who can see a document; a manager may set only levels they hold, and admin-only documents change only through an admin",
+      "operation": "execute",
+      "sql": "UPDATE documents SET visibility=:visibility,team_id=CASE WHEN :visibility='team' THEN :team_id END,updated_at=:__now WHERE id=:document_id AND org_id=:org_id AND status<>'withdrawn' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (documents.visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))) AND (:visibility IN ('public','member','team','manager','admin') AND (:visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))) AND (:visibility<>'team' OR (:team_id IS NOT NULL AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:team_id AND t.org_id=:org_id AND t.is_external=0))))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "member",
+            "team",
+            "manager",
+            "admin"
+          ]
+        },
+        "team_id": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "withdraw_document",
+      "description": "Withdraw a document so that nobody can list or download it; the record stays for the history",
+      "operation": "execute",
+      "sql": "UPDATE documents SET status='withdrawn',updated_at=:__now WHERE id=:document_id AND org_id=:org_id AND status<>'withdrawn' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (documents.visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin')))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "mark_document_stored",
+      "description": "Record that a registered document's file has been stored, with its integrity hash, in the app's storage; the storage key is never returned by any list action",
+      "operation": "execute",
+      "sql": "UPDATE documents SET status='stored',storage_key=:storage_key,content_type=:content_type,byte_size=:byte_size,sha256=:sha256,updated_at=:__now WHERE id=:document_id AND org_id=:org_id AND status='registered' AND sha256=:sha256 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (documents.visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin')))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "storage_key": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "content_type": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "byte_size": {
+          "type": "integer",
+          "min": 0,
+          "max": 10485760
+        },
+        "sha256": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "log_document_change",
+      "description": "Append a document registration, metadata, visibility, storage or withdrawal event to the document history with its actor",
+      "operation": "execute",
+      "sql": "INSERT INTO document_history (id,org_id,document_id,action,old_visibility,new_visibility,actor_user_id,created_at) SELECT :id,documents.org_id,documents.id,:action,:old_visibility,documents.visibility,:__user_id,:__now FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND :action IN ('registered','details_updated','visibility_changed','stored','withdrawn')",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "registered",
+            "details_updated",
+            "visibility_changed",
+            "stored",
+            "withdrawn"
+          ]
+        },
+        "old_visibility": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "public",
+            "member",
+            "team",
+            "manager",
+            "admin"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "append-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_documents",
+      "description": "List the club documents the caller may see (visibility, scope, withdrawal and expiry applied in SQL); never returns storage keys or uploader identities",
+      "operation": "query",
+      "sql": "SELECT documents.id,documents.org_id,documents.scope_type,documents.scope_id,documents.team_id,documents.title,documents.description,documents.category,documents.visibility,documents.source_attribution,documents.effective_on,documents.revision,documents.expires_on,documents.status,documents.content_type,documents.byte_size,documents.sha256,COALESCE(documents.updated_at,documents.created_at) AS updated_at FROM documents WHERE documents.org_id=:org_id AND (documents.status<>'withdrawn' AND (documents.expires_on IS NULL OR documents.expires_on>=date(:__now/1000,'unixepoch')) AND (documents.visibility='public' OR (documents.visibility='member' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1)) OR (documents.visibility='team' AND ((EXISTS (SELECT 1 FROM team_players tp WHERE tp.team_id=documents.team_id AND tp.user_id=:__user_id AND tp.is_active=1) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.team_id=documents.team_id AND tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL)) OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')))) OR (documents.visibility='manager' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))) OR (documents.visibility='admin' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin'))))) AND (:category IS NULL OR documents.category=:category) AND (:scope_type IS NULL OR documents.scope_type=:scope_type) AND (:query IS NULL OR lower(documents.title) LIKE '%'||lower(:query)||'%') ORDER BY documents.title, documents.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "guidance",
+            "behaviour",
+            "etiquette",
+            "competition",
+            "roster",
+            "other"
+          ]
+        },
+        "scope_type": {
+          "type": "string",
+          "default": null,
+          "enum": [
+            "club",
+            "season",
+            "team",
+            "competition"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "default": null,
+          "maxLength": 80
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "member",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "member",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
+        "redacts": [
+          "uploaded_by",
+          "storage_key"
+        ]
+      }
+    },
+    {
+      "name": "check_document_access",
+      "description": "Authorise a download: returns the document only when it is stored and visible to the caller; the file is then served by the app's document proxy, which records the access",
+      "operation": "query",
+      "sql": "SELECT documents.id,documents.title,documents.content_type,documents.byte_size,documents.sha256 FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND documents.status='stored' AND (documents.status<>'withdrawn' AND (documents.expires_on IS NULL OR documents.expires_on>=date(:__now/1000,'unixepoch')) AND (documents.visibility='public' OR (documents.visibility='member' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1)) OR (documents.visibility='team' AND ((EXISTS (SELECT 1 FROM team_players tp WHERE tp.team_id=documents.team_id AND tp.user_id=:__user_id AND tp.is_active=1) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.team_id=documents.team_id AND tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL)) OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')))) OR (documents.visibility='manager' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))) OR (documents.visibility='admin' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin')))))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "member",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "member",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "log_document_access",
+      "description": "Append a document view or download attempt and its outcome to the access log with the caller as actor",
+      "operation": "execute",
+      "sql": "INSERT INTO document_access_log (id,org_id,document_id,actor_user_id,action,outcome,created_at) SELECT :id,documents.org_id,documents.id,:__user_id,:action,:outcome,:__now FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND :action IN ('view','download') AND :outcome IN ('allowed','denied')",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "view",
+            "download"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "denied"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "member",
+        "roles": [],
+        "audience": "member",
+        "idempotency": "append-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_document_history",
+      "description": "List a document's history (registration, detail, visibility, storage and withdrawal events) with the actor for each; managers only",
+      "operation": "query",
+      "sql": "SELECT h.id,h.document_id,h.action,h.old_visibility,h.new_visibility,h.actor_user_id,h.created_at FROM document_history h WHERE h.org_id=:org_id AND h.document_id=:document_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=h.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY h.created_at DESC, h.id DESC LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_document_access_log",
+      "description": "List who viewed or downloaded a document and whether each attempt was allowed; managers only",
+      "operation": "query",
+      "sql": "SELECT a.id,a.document_id,a.actor_user_id,a.action,a.outcome,a.created_at FROM document_access_log a WHERE a.org_id=:org_id AND a.document_id=:document_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=a.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY a.created_at DESC, a.id DESC LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_my_clubs",
+      "description": "List the clubs the caller actively belongs to, with the caller's role in each; any club role may read its own memberships",
+      "operation": "query",
+      "sql": "SELECT o.id,o.name,cm.role,COALESCE(o.created_at,0) AS updated_at FROM organizations o JOIN club_memberships cm ON cm.org_id=o.id WHERE cm.user_id=:__user_id AND cm.is_active=1 ORDER BY o.name, o.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "member",
+        "roles": [],
+        "audience": "member",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
         "redacts": []
       }
     }

@@ -67,10 +67,12 @@ class ContactDetailTests(unittest.TestCase):
     def test_legacy_venue_phone_and_roster_contact_are_migrated_into_contact_details(self):
         db = connect()
         db.row_factory = sqlite3.Row
-        for migration in MIGRATIONS[:-1]:
+        names = [m["name"] for m in MIGRATIONS]
+        contact = names.index("0014_contact_details")
+        for migration in MIGRATIONS[:contact]:
             db.executescript(migration["sql"])
         db.executescript(SEED)
-        db.executescript(MIGRATIONS[-1]["sql"])
+        db.executescript(MIGRATIONS[contact]["sql"])
         migrated = {(r["subject_type"], r["subject_id"], r["kind"], r["value"]) for r in db.execute(
             "SELECT subject_type,subject_id,kind,value FROM contact_details").fetchall()}
         self.assertEqual(migrated, {("venue", "va", "phone", FAKE_PHONE), ("person", "rp1", "other", FAKE_ROSTER_CONTACT)})
