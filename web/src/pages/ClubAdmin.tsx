@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
+import { MCP_CATALOG } from '../generated/mcpCatalog'
+import { outcomeOf, recordAudit } from './auditTrail'
 
 type Club = { id: string; name: string; slug: string; role: string }
 type Season = { id: string; org_id: string; name: string; starts_on: string; ends_on: string; status: string }
@@ -66,11 +68,16 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
 
   async function runAction(name: string, values: Record<string, unknown>, success: string) {
     setBusy(true); setError(''); setMessage(''); setInviteLink('')
+    const targetId = String(values.id ?? values.venue_id ?? clubId)
     try {
-      await app.actions.call(name, values)
-      setMessage(success)
+      const result = await app.actions.call(name, values)
+      const audited = await recordAudit(app, { orgId: clubId, action: name, targetType: 'club_record', targetId, outcome: outcomeOf(result) })
+      setMessage(audited ? success : `${success} The audit record could not be written.`)
       await loadClubData()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'The change could not be saved.') }
+    } catch (reason) {
+      await recordAudit(app, { orgId: clubId, action: name, targetType: 'club_record', targetId, outcome: 'refused' })
+      setError(reason instanceof Error ? reason.message : 'The change could not be saved.')
+    }
     finally { setBusy(false) }
   }
 
@@ -89,6 +96,7 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
 
   async function finishFirstClubSetup(orgId: string, name: string) {
     await app.actions.call('bootstrap_club_admin', { id: id(), org_id: orgId, display_name: app.auth.user?.login ?? name })
+    await recordAudit(app, { orgId, action: 'bootstrap_club_admin', targetType: 'club_record', targetId: orgId, outcome: 'succeeded' })
     const managed = await app.actions.call<Rows<Club>>('list_managed_clubs', {})
     if (!(managed.rows ?? []).some((item) => item.id === orgId)) throw new Error('Administrator access could not be confirmed yet. Retry setup below.')
     setPendingClub(null)
@@ -111,7 +119,9 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     const token = id()
     setBusy(true); setError(''); setMessage(''); setInviteLink('')
     try {
-      await app.actions.call('create_team_invite', { id: id(), team_id: teamId, invite_token: token })
+      const inviteId = id()
+      const result = await app.actions.call('create_team_invite', { id: inviteId, team_id: teamId, invite_token: token })
+      await recordAudit(app, { orgId: clubId, action: 'create_team_invite', targetType: 'team_invite', targetId: inviteId, outcome: outcomeOf(result) })
       const invite = await app.invites.create({ role: 'player', group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
       setInviteLink(invite.link)
       setMessage('PAS team invite created. Share this link with the invited player; the membership is added after redemption.')
@@ -148,6 +158,11 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
         <RecordList title="Club managers and administrators" rows={members.filter((x) => ['admin','manager'].includes(x.role)).map((x) => `${x.display_name} · ${x.role}`)} empty="No managers listed." />
       </section>
     </>}
+    <details className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
+      <summary className="cursor-pointer font-bold text-[var(--ink)]">Integration actions ({MCP_CATALOG.length})</summary>
+      <p className="mt-3 text-sm text-[var(--muted)]">Actions available to club systems through the ProAppStore MCP. Each call is checked against the caller’s club membership on the server. Contract details are in docs/mcp-contract.md.</p>
+      <ul className="mt-3 divide-y divide-[var(--line)] text-sm">{MCP_CATALOG.map((action) => <li key={action.name} className="py-3"><code className="font-semibold text-[var(--ink)]">{action.name}</code><p className="mt-1 text-[var(--muted)]">{action.description}</p><p className="mt-1 text-xs text-[var(--muted)]">Roles: {action.roles.join(', ') || action.access} · {action.idempotency}{action.audit ? ' · audited' : ''}</p></li>)}</ul>
+    </details>
   </main>
 }
 

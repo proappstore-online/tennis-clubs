@@ -45,6 +45,10 @@ There is no app-specific `.env` file or Google client secret in this repository.
 
 The checked-in pre-push hook runs `scripts/check-public-snapshot.py` before a push. Enable it in this clone with `git config --local core.hooksPath .githooks`. The checker reviews tracked files and commit author/committer identities and trailers. CI runs the same checker as an additional review gate.
 
+## MCP contract
+
+The club administrative integration surface is documented in `docs/mcp-contract.md`, generated from `mcp.json` by `python3 scripts/render_mcp_catalog.py`. It covers roles, errors, idempotency, pagination, versioning, audit and redaction for every action.
+
 ## Scaffolding manually
 
 If you really want to scaffold by hand:

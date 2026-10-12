@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@proappstore/sdk'
+import { outcomeOf, recordAudit, type AuditOutcome } from './auditTrail'
 
 type AppClient = { actions: { call<T = unknown>(name: string, values: Record<string, unknown>): Promise<T> }; storage: { uploadForReview(path: string, data: Blob, contentType?: string): Promise<{ key: string }>; downloadForReview(userId: string, path: string): Promise<Response> }; auth: { user: { id: string } | null } }
-type Fixture = { id: string; starts_at: string; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; in_count: number; out_count: number; pending_count: number }
+type Fixture = { id: string; org_id: string; starts_at: string; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; in_count: number; out_count: number; pending_count: number }
 type Player = { user_id: string; display_name: string; availability: 'in' | 'out' | 'pending'; updated_at: number | null }
 type Candidate = { user_id: string; display_name: string }
 type Activity = { user_id: string; display_name: string; action: string; old_availability: string | null; new_availability: string | null; created_at: number }
@@ -25,6 +26,10 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  async function audit(action: string, targetType: string, targetId: string, outcome: AuditOutcome) {
+    const orgId = fixtures.find((fixture) => fixture.id === fixtureId)?.org_id
+    return orgId ? recordAudit(app, { orgId, action, targetType, targetId, outcome }) : false
+  }
   async function loadFixtures() {
     try {
       const result = await app.actions.call<{ rows: Fixture[] }>('list_managed_fixtures', {})
@@ -56,15 +61,21 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     setBusy(true); setError(''); setMessage('')
     try {
       const previousPlayer = players.find((player) => player.user_id === userId)
-      await app.actions.call(action, { fixture_id: fixtureId, user_id: userId })
+      const result = await app.actions.call(action, { fixture_id: fixtureId, user_id: userId })
       if (action === 'add_fixture_roster_player') {
         await app.actions.call('log_fixture_roster_added', { fixture_id: fixtureId, user_id: userId })
       } else if (previousPlayer) {
         await app.actions.call('log_fixture_roster_removed', { fixture_id: fixtureId, user_id: userId, old_availability: previousPlayer.availability })
       }
-      await Promise.all([loadRoster(), loadFixtures()]); setMessage(action.startsWith('add') ? 'Player added to the published roster.' : 'Player removed from this fixture roster.')
+      const audited = await audit(action, 'fixture_roster_player', `${fixtureId}:${userId}`, outcomeOf(result))
+      await Promise.all([loadRoster(), loadFixtures()])
+      const done = action.startsWith('add') ? 'Player added to the published roster.' : 'Player removed from this fixture roster.'
+      setMessage(audited ? done : `${done} The audit record could not be written.`)
     }
-    catch { setError('The roster change could not be saved.') }
+    catch {
+      await audit(action, 'fixture_roster_player', `${fixtureId}:${userId}`, 'refused')
+      setError('The roster change could not be saved.')
+    }
     finally { setBusy(false) }
   }
   async function saveMatchDay(event: React.FormEvent<HTMLFormElement>) {
@@ -73,10 +84,14 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     const form = new FormData(event.currentTarget)
     setBusy(true); setError(''); setMessage('')
     try {
-      await app.actions.call('update_fixture_match_day', { fixture_id: fixtureId, status: String(form.get('status')), match_notice: String(form.get('match_notice') ?? '') })
+      const result = await app.actions.call('update_fixture_match_day', { fixture_id: fixtureId, status: String(form.get('status')), match_notice: String(form.get('match_notice') ?? '') })
+      const audited = await audit('update_fixture_match_day', 'fixture', fixtureId, outcomeOf(result))
       await loadFixtures()
-      setMessage('Match-day status and notice published.')
-    } catch { setError('The match-day update could not be saved.') }
+      setMessage(audited ? 'Match-day status and notice published.' : 'Match-day status and notice published. The audit record could not be written.')
+    } catch {
+      await audit('update_fixture_match_day', 'fixture', fixtureId, 'refused')
+      setError('The match-day update could not be saved.')
+    }
     finally { setBusy(false) }
   }
   async function saveResult(event: React.FormEvent<HTMLFormElement>) {
@@ -94,8 +109,10 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
       const sets = String(form.get('set_results') ?? '').trim()
       if (sets) JSON.parse(sets)
       const submissionId = crypto.randomUUID()
-      await app.actions.call('submit_fixture_result', { id: submissionId, fixture_id: fixtureId, home_score: Number(form.get('home_score')), away_score: Number(form.get('away_score')), set_results: sets, scorecard_user_id: scorecardUserId, scorecard_path: scorecardPath, correction_note: String(form.get('correction_note') ?? '') })
-      await app.actions.call('apply_fixture_result_to_fixture', { submission_id: submissionId, fixture_id: fixtureId })
+      const submitted = await app.actions.call('submit_fixture_result', { id: submissionId, fixture_id: fixtureId, home_score: Number(form.get('home_score')), away_score: Number(form.get('away_score')), set_results: sets, scorecard_user_id: scorecardUserId, scorecard_path: scorecardPath, correction_note: String(form.get('correction_note') ?? '') })
+      await audit('submit_fixture_result', 'fixture_result', submissionId, outcomeOf(submitted))
+      const applied = await app.actions.call('apply_fixture_result_to_fixture', { submission_id: submissionId, fixture_id: fixtureId })
+      await audit('apply_fixture_result_to_fixture', 'fixture', fixtureId, outcomeOf(applied))
       await loadRoster(); await loadFixtures(); setMessage('Result submission saved. Earlier submissions remain in the history.')
     } catch (e) { setError(e instanceof Error ? e.message : 'The result could not be saved.') }
     finally { setBusy(false) }

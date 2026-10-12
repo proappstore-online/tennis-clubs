@@ -3,6 +3,8 @@ import sqlite3
 import unittest
 from pathlib import Path
 
+from mcp_harness import connect
+
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = json.loads((ROOT / "migrations.json").read_text())["migrations"]
 TOOLS = {tool["name"]: tool for tool in json.loads((ROOT / "mcp.json").read_text())["tools"]}
@@ -10,7 +12,7 @@ TOOLS = {tool["name"]: tool for tool in json.loads((ROOT / "mcp.json").read_text
 
 class FixtureResultTests(unittest.TestCase):
     def setUp(self):
-        self.db = sqlite3.connect(":memory:")
+        self.db = connect()
         self.db.row_factory = sqlite3.Row
         for migration in MIGRATIONS:
             self.db.executescript(migration["sql"])

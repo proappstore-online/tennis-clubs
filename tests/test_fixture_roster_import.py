@@ -6,6 +6,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from mcp_harness import connect
+
 
 ROOT = Path(__file__).resolve().parents[1]
 IMPORT_LOGIC = ROOT / "web/src/pages/fixtureImportLogic.ts"
@@ -107,7 +109,7 @@ class FixtureRosterImportTests(unittest.TestCase):
         migrations = json.loads((ROOT / "migrations.json").read_text())["migrations"]
         actions = json.loads((ROOT / "mcp.json").read_text())["tools"]
         fixture_action = next(item for item in actions if item["name"] == "upsert_imported_fixture")
-        conn = sqlite3.connect(":memory:")
+        conn = connect()
         conn.row_factory = sqlite3.Row
         for migration in migrations:
             conn.executescript(migration["sql"])

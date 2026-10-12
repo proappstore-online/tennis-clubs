@@ -39,6 +39,10 @@
     {
       "name": "0007_fixture_result_submissions",
       "sql": "CREATE TABLE fixture_result_submissions (id TEXT PRIMARY KEY, fixture_id TEXT NOT NULL REFERENCES fixtures(id), submitted_by TEXT NOT NULL, home_score INTEGER NOT NULL CHECK(home_score>=0), away_score INTEGER NOT NULL CHECK(away_score>=0), set_results TEXT, scorecard_user_id TEXT, scorecard_path TEXT, submitted_at INTEGER NOT NULL, correction_note TEXT); CREATE INDEX idx_fixture_results_history ON fixture_result_submissions(fixture_id,submitted_at DESC);"
+    },
+    {
+      "name": "0008_mcp_contract",
+      "sql": "CREATE TABLE IF NOT EXISTS import_runs (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), actor_user_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('fixtures','roster')), received_count INTEGER NOT NULL CHECK(received_count>=0), saved_count INTEGER NOT NULL CHECK(saved_count>=0), rejected_count INTEGER NOT NULL DEFAULT 0 CHECK(rejected_count>=0), status TEXT NOT NULL CHECK(status IN ('saved','rejected')), created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_import_runs_org ON import_runs(org_id, created_at DESC); CREATE TABLE IF NOT EXISTS audit_events (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), actor_user_id TEXT NOT NULL, action TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT, outcome TEXT NOT NULL CHECK(outcome IN ('succeeded','refused')), created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_audit_events_org ON audit_events(org_id, created_at DESC); ALTER TABLE fixtures ADD COLUMN updated_at INTEGER; ALTER TABLE venues ADD COLUMN updated_at INTEGER"
     }
   ]
 }
