@@ -16,12 +16,11 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
   async function loadOptions() {
     setBusy(true); setMessage('')
     try {
-      const [manager, admin, owner] = await Promise.all([app.roles.check('manager'), app.roles.check('admin'), app.roles.check('owner')])
-      if (!manager && !admin && !owner) { setAuthorized(false); return }
-      setAuthorized(true)
       const result = await app.actions.call<{ rows: Option[] }>('list_fixture_import_options', {})
-      setOptions(result.rows ?? [])
-      if (!(result.rows ?? []).some((item) => item.kind === 'team')) setMessage('Your account has no manager or admin membership for a club.')
+      const rows = result.rows ?? []
+      setAuthorized(rows.length > 0)
+      setOptions(rows)
+      if (!rows.some((item) => item.kind === 'team')) setMessage('Your account has no manager, convenor or admin membership for a club.')
     } catch { setAuthorized(false); setMessage('Manager access could not be verified for fixture imports.') }
     finally { setBusy(false) }
   }

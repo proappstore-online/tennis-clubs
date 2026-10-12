@@ -67,9 +67,9 @@
     },
     {
       "name": "list_fixture_import_options",
-      "description": "List teams and venues for clubs where the signed-in user is a manager or admin",
+      "description": "List teams and venues for clubs where the signed-in user is a manager, convenor or admin",
       "operation": "query",
-      "sql": "SELECT 'team' AS kind, t.id, t.name, t.org_id, t.division_id, s.name AS season_name FROM teams t LEFT JOIN divisions d ON d.id = t.division_id LEFT JOIN seasons s ON s.id = d.season_id WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) UNION ALL SELECT 'venue' AS kind, v.id, v.name, v.org_id, NULL AS division_id, NULL AS season_name FROM venues v WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = v.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY kind, name",
+      "sql": "SELECT 'team' AS kind, t.id, t.name, t.org_id, t.division_id, s.name AS season_name FROM teams t LEFT JOIN divisions d ON d.id = t.division_id LEFT JOIN seasons s ON s.id = d.season_id WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) UNION ALL SELECT 'venue' AS kind, v.id, v.name, v.org_id, NULL AS division_id, NULL AS season_name FROM venues v WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = v.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY kind, name",
       "params": {},
       "requires_auth": true
     },
@@ -77,7 +77,7 @@
       "name": "upsert_imported_fixture",
       "description": "Create or update a fixture in a club managed by the signed-in user",
       "operation": "execute",
-      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id",
+      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id",
       "params": {
         "id": {
           "type": "string"
@@ -110,7 +110,7 @@
       "name": "upsert_imported_roster_player",
       "description": "Store a private roster contact for a fixture in a club managed by the signed-in user",
       "operation": "execute",
-      "sql": "INSERT INTO roster_players (id, fixture_id, player_name, contact, availability, created_at) SELECT :id, f.id, :player_name, :contact, 'pending', :__now FROM fixtures f JOIN teams ht ON ht.id = f.home_team_id JOIN teams at ON at.id = f.away_team_id WHERE f.org_id = :org_id AND f.starts_at = :starts_at AND f.round_label = :round_label AND ((ht.name = :team AND at.name = :opponent) OR (at.name = :team AND ht.name = :opponent)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = f.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ON CONFLICT(fixture_id, player_name) DO UPDATE SET contact = excluded.contact",
+      "sql": "INSERT INTO roster_players (id, fixture_id, player_name, contact, availability, created_at) SELECT :id, f.id, :player_name, :contact, 'pending', :__now FROM fixtures f JOIN teams ht ON ht.id = f.home_team_id JOIN teams at ON at.id = f.away_team_id WHERE f.org_id = :org_id AND f.starts_at = :starts_at AND f.round_label = :round_label AND ((ht.name = :team AND at.name = :opponent) OR (at.name = :team AND ht.name = :opponent)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = f.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id, player_name) DO UPDATE SET contact = excluded.contact",
       "params": {
         "id": {
           "type": "string"
@@ -143,7 +143,7 @@
       "name": "list_managed_clubs",
       "description": "List clubs the caller administers",
       "operation": "query",
-      "sql": "SELECT o.id, o.name, o.slug, cm.role FROM organizations o JOIN club_memberships cm ON cm.org_id=o.id WHERE cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager') ORDER BY o.name",
+      "sql": "SELECT o.id, o.name, o.slug, cm.role FROM organizations o JOIN club_memberships cm ON cm.org_id=o.id WHERE cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager') ORDER BY o.name",
       "params": {},
       "requires_auth": true
     },
@@ -195,7 +195,7 @@
       "name": "list_club_seasons",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT id,org_id,name,starts_on,ends_on,status FROM seasons WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY starts_on DESC",
+      "sql": "SELECT id,org_id,name,starts_on,ends_on,status FROM seasons WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY starts_on DESC",
       "params": {
         "org_id": {
           "type": "string"
@@ -207,7 +207,7 @@
       "name": "list_club_venues",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT id,org_id,name,address,map_url,notes,convenor_phone FROM venues WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY name",
+      "sql": "SELECT id,org_id,name,address,map_url,notes,convenor_phone FROM venues WHERE org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY name",
       "params": {
         "org_id": {
           "type": "string"
@@ -219,7 +219,7 @@
       "name": "list_club_teams",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT t.id,t.org_id,t.name,t.colour,t.division_id,d.name AS division_name,s.name AS season_name FROM teams t LEFT JOIN divisions d ON d.id=t.division_id LEFT JOIN seasons s ON s.id=d.season_id WHERE t.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY t.name",
+      "sql": "SELECT t.id,t.org_id,t.name,t.colour,t.division_id,d.name AS division_name,s.name AS season_name FROM teams t LEFT JOIN divisions d ON d.id=t.division_id LEFT JOIN seasons s ON s.id=d.season_id WHERE t.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY t.name",
       "params": {
         "org_id": {
           "type": "string"
@@ -231,7 +231,7 @@
       "name": "list_club_divisions",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT d.id,d.name,d.format,d.season_id,s.org_id FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE s.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY d.name",
+      "sql": "SELECT d.id,d.name,d.format,d.season_id,s.org_id FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE s.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY d.name",
       "params": {
         "org_id": {
           "type": "string"
@@ -243,7 +243,7 @@
       "name": "list_club_members",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT cm.id,cm.user_id,cm.role,cm.display_name,cm.is_active FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.is_active=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) ORDER BY cm.display_name",
+      "sql": "SELECT cm.id,cm.user_id,cm.role,cm.display_name,cm.is_active FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.is_active=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY cm.display_name",
       "params": {
         "org_id": {
           "type": "string"
@@ -255,7 +255,7 @@
       "name": "create_season",
       "description": "Create a season in a club managed by the caller",
       "operation": "execute",
-      "sql": "INSERT INTO seasons (id,org_id,name,starts_on,ends_on,status,created_at) SELECT :id,:org_id,:name,:starts_on,:ends_on,:status,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) AND :starts_on <= :ends_on",
+      "sql": "INSERT INTO seasons (id,org_id,name,starts_on,ends_on,status,created_at) SELECT :id,:org_id,:name,:starts_on,:ends_on,:status,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND :starts_on <= :ends_on",
       "params": {
         "id": {
           "type": "string"
@@ -282,7 +282,7 @@
       "name": "create_division",
       "description": "Create a division in a managed club season",
       "operation": "execute",
-      "sql": "INSERT INTO divisions (id,season_id,name,format,created_at) SELECT :id,s.id,:name,:format,:__now FROM seasons s WHERE s.id=:season_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = s.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager'))",
+      "sql": "INSERT INTO divisions (id,season_id,name,format,created_at) SELECT :id,s.id,:name,:format,:__now FROM seasons s WHERE s.id=:season_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = s.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -303,7 +303,7 @@
       "name": "create_venue",
       "description": "Create a venue in a club managed by the caller",
       "operation": "execute",
-      "sql": "INSERT INTO venues (id,org_id,name,address,map_url,notes,convenor_phone,created_at) SELECT :id,:org_id,:name,:address,:map_url,:notes,:convenor_phone,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager'))",
+      "sql": "INSERT INTO venues (id,org_id,name,address,map_url,notes,convenor_phone,created_at) SELECT :id,:org_id,:name,:address,:map_url,:notes,:convenor_phone,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -334,7 +334,7 @@
       "name": "create_team",
       "description": "Create a team in a managed club; division must belong to that club",
       "operation": "execute",
-      "sql": "INSERT INTO teams (id,org_id,division_id,name,colour,created_at) SELECT :id,:org_id,:division_id,:name,:colour,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager')) AND EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=:division_id AND s.org_id=:org_id)",
+      "sql": "INSERT INTO teams (id,org_id,division_id,name,colour,created_at) SELECT :id,:org_id,:division_id,:name,:colour,:__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=:division_id AND s.org_id=:org_id)",
       "params": {
         "id": {
           "type": "string"
@@ -358,7 +358,7 @@
       "name": "create_team_invite",
       "description": "Create a pending scoped team membership for a PAS invite",
       "operation": "execute",
-      "sql": "INSERT INTO team_memberships (id,org_id,team_id,invite_token,created_by,created_at) SELECT :id,t.org_id,t.id,:invite_token,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','manager'))",
+      "sql": "INSERT INTO team_memberships (id,org_id,team_id,invite_token,created_by,created_at) SELECT :id,t.org_id,t.id,:invite_token,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -374,7 +374,7 @@
     },
     {
       "name": "accept_team_invite",
-      "description": "Accept a team membership using its one-time token after PAS invite redemption",
+      "description": "Accept a team membership using its one-time token; the caller needs no PAS app role",
       "operation": "execute",
       "sql": "UPDATE team_memberships SET user_id=:__user_id,display_name=:display_name,invite_token=NULL,accepted_at=:__now WHERE invite_token=:claim_token AND user_id IS NULL",
       "params": {
@@ -385,18 +385,43 @@
           "type": "string"
         }
       },
-      "requires_auth": true,
-      "auth": {
-        "app_roles": [
-          "player"
-        ]
-      }
+      "requires_auth": true
+    },
+    {
+      "name": "activate_invited_club_membership",
+      "description": "Create the club player membership for a pending team invite; existing club memberships keep their role and active state",
+      "operation": "execute",
+      "sql": "INSERT INTO club_memberships (id,org_id,user_id,role,display_name,is_active,created_at) SELECT :id,tm.org_id,:__user_id,'player',:display_name,1,:__now FROM team_memberships tm WHERE tm.invite_token=:claim_token AND tm.user_id IS NULL ON CONFLICT(org_id,user_id) DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "claim_token": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "get_my_club_permissions",
+      "description": "Return the caller role, active state and can_manage flag for one club; can_manage is true only for active admin, convenor or manager roles",
+      "operation": "query",
+      "sql": "SELECT cm.org_id,cm.role,cm.is_active,(cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AS can_manage FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id",
+      "params": {
+        "org_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
     },
     {
       "name": "list_managed_fixtures",
       "description": "List fixtures managed by the caller with roster reply totals",
       "operation": "query",
-      "sql": "SELECT f.id,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,ht.name AS home_team_name,at.name AS away_team_name,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) ORDER BY f.starts_at",
+      "sql": "SELECT f.id,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,ht.name AS home_team_name,at.name AS away_team_name,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY f.starts_at",
       "params": {},
       "requires_auth": true
     },
@@ -404,7 +429,7 @@
       "name": "list_managed_fixture_roster",
       "description": "List roster and latest change time for a fixture managed by caller",
       "operation": "query",
-      "sql": "SELECT r.user_id,r.display_name,r.availability,r.confirmed_at,COALESCE((SELECT MAX(a.created_at) FROM fixture_roster_activity a WHERE a.fixture_id=r.fixture_id AND a.user_id=r.user_id),r.confirmed_at) AS updated_at FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) ORDER BY r.display_name",
+      "sql": "SELECT r.user_id,r.display_name,r.availability,r.confirmed_at,COALESCE((SELECT MAX(a.created_at) FROM fixture_roster_activity a WHERE a.fixture_id=r.fixture_id AND a.user_id=r.user_id),r.confirmed_at) AS updated_at FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY r.display_name",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -417,7 +442,7 @@
       "name": "list_fixture_team_candidates",
       "description": "List accepted members of either fixture team for roster publishing",
       "operation": "query",
-      "sql": "SELECT DISTINCT tm.user_id,COALESCE(tm.display_name,cm.display_name) AS display_name FROM fixtures f JOIN team_memberships tm ON tm.team_id IN(f.home_team_id,f.away_team_id) LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND tm.user_id IS NOT NULL AND tm.accepted_at IS NOT NULL AND t.org_id=f.org_id AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','manager')) ORDER BY display_name",
+      "sql": "SELECT DISTINCT tm.user_id,COALESCE(tm.display_name,cm.display_name) AS display_name FROM fixtures f JOIN team_memberships tm ON tm.team_id IN(f.home_team_id,f.away_team_id) LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND tm.user_id IS NOT NULL AND tm.accepted_at IS NOT NULL AND t.org_id=f.org_id AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','convenor','manager')) ORDER BY display_name",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -430,7 +455,7 @@
       "name": "add_fixture_roster_player",
       "description": "Publish a team member on a fixture roster",
       "operation": "execute",
-      "sql": "INSERT INTO fixture_roster(fixture_id,user_id,display_name,availability) SELECT f.id,tm.user_id,COALESCE(tm.display_name,cm.display_name),'pending' FROM fixtures f JOIN team_memberships tm ON tm.user_id=:user_id AND tm.team_id IN(f.home_team_id,f.away_team_id) AND tm.accepted_at IS NOT NULL LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams owned WHERE owned.id=tm.team_id AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','manager')) ON CONFLICT(fixture_id,user_id) DO NOTHING",
+      "sql": "INSERT INTO fixture_roster(fixture_id,user_id,display_name,availability) SELECT f.id,tm.user_id,COALESCE(tm.display_name,cm.display_name),'pending' FROM fixtures f JOIN team_memberships tm ON tm.user_id=:user_id AND tm.team_id IN(f.home_team_id,f.away_team_id) AND tm.accepted_at IS NOT NULL LEFT JOIN teams t ON t.id=tm.team_id LEFT JOIN club_memberships cm ON cm.org_id=t.org_id AND cm.user_id=tm.user_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams owned WHERE owned.id=tm.team_id AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships mgr WHERE mgr.org_id=f.org_id AND mgr.user_id=:__user_id AND mgr.is_active=1 AND mgr.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id,user_id) DO NOTHING",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -447,7 +472,7 @@
       "name": "log_fixture_roster_added",
       "description": "Record a successfully published roster player after the roster insert",
       "operation": "execute",
-      "sql": "INSERT INTO fixture_roster_activity(fixture_id,user_id,display_name,action,new_availability,actor_user_id,created_at) SELECT r.fixture_id,r.user_id,r.display_name,'added',r.availability,:__user_id,:__now FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE r.fixture_id=:fixture_id AND r.user_id=:user_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) AND EXISTS (SELECT 1 FROM team_memberships tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND t.org_id=f.org_id)",
+      "sql": "INSERT INTO fixture_roster_activity(fixture_id,user_id,display_name,action,new_availability,actor_user_id,created_at) SELECT r.fixture_id,r.user_id,r.display_name,'added',r.availability,:__user_id,:__now FROM fixture_roster r JOIN fixtures f ON f.id=r.fixture_id WHERE r.fixture_id=:fixture_id AND r.user_id=:user_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM team_memberships tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND t.org_id=f.org_id)",
       "params": {
         "fixture_id": {
           "type": "string"
@@ -462,7 +487,7 @@
       "name": "remove_fixture_roster_player",
       "description": "Remove a player from a fixture roster",
       "operation": "execute",
-      "sql": "DELETE FROM fixture_roster WHERE fixture_id=:fixture_id AND user_id=:user_id AND EXISTS (SELECT 1 FROM fixtures f JOIN club_memberships cm ON cm.org_id=f.org_id WHERE f.id=:fixture_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager') AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id))",
+      "sql": "DELETE FROM fixture_roster WHERE fixture_id=:fixture_id AND user_id=:user_id AND EXISTS (SELECT 1 FROM fixtures f JOIN club_memberships cm ON cm.org_id=f.org_id WHERE f.id=:fixture_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager') AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id))",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -479,7 +504,7 @@
       "name": "log_fixture_roster_removed",
       "description": "Record a removed roster player using the prior availability after the roster delete",
       "operation": "execute",
-      "sql": "INSERT INTO fixture_roster_activity(fixture_id,user_id,display_name,action,old_availability,actor_user_id,created_at) SELECT :fixture_id,:user_id,COALESCE((SELECT tm.display_name FROM team_memberships tm JOIN teams owned ON owned.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND owned.org_id=f.org_id ORDER BY tm.team_id LIMIT 1),(SELECT cm_player.display_name FROM club_memberships cm_player WHERE cm_player.org_id=f.org_id AND cm_player.user_id=:user_id)),'removed',:old_availability,:__user_id,:__now FROM fixtures f WHERE f.id=:fixture_id AND :old_availability IN ('in','out','pending') AND NOT EXISTS (SELECT 1 FROM fixture_roster r WHERE r.fixture_id=:fixture_id AND r.user_id=:user_id) AND EXISTS (SELECT 1 FROM team_memberships tm JOIN teams owned ON owned.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager'))",
+      "sql": "INSERT INTO fixture_roster_activity(fixture_id,user_id,display_name,action,old_availability,actor_user_id,created_at) SELECT :fixture_id,:user_id,COALESCE((SELECT tm.display_name FROM team_memberships tm JOIN teams owned ON owned.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND owned.org_id=f.org_id ORDER BY tm.team_id LIMIT 1),(SELECT cm_player.display_name FROM club_memberships cm_player WHERE cm_player.org_id=f.org_id AND cm_player.user_id=:user_id)),'removed',:old_availability,:__user_id,:__now FROM fixtures f WHERE f.id=:fixture_id AND :old_availability IN ('in','out','pending') AND NOT EXISTS (SELECT 1 FROM fixture_roster r WHERE r.fixture_id=:fixture_id AND r.user_id=:user_id) AND EXISTS (SELECT 1 FROM team_memberships tm JOIN teams owned ON owned.id=tm.team_id WHERE tm.user_id=:user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "fixture_id": {
           "type": "string"
@@ -497,7 +522,7 @@
       "name": "list_fixture_roster_activity",
       "description": "Read timestamped roster changes for a managed fixture",
       "operation": "query",
-      "sql": "SELECT user_id,display_name,action,old_availability,new_availability,created_at FROM fixture_roster_activity a WHERE fixture_id=:fixture_id AND EXISTS (SELECT 1 FROM fixtures f JOIN club_memberships cm ON cm.org_id=f.org_id WHERE f.id=a.fixture_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager') AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id)) ORDER BY created_at DESC LIMIT 100",
+      "sql": "SELECT user_id,display_name,action,old_availability,new_availability,created_at FROM fixture_roster_activity a WHERE fixture_id=:fixture_id AND EXISTS (SELECT 1 FROM fixtures f JOIN club_memberships cm ON cm.org_id=f.org_id WHERE f.id=a.fixture_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager') AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id)) ORDER BY created_at DESC LIMIT 100",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -510,7 +535,7 @@
       "name": "update_venue",
       "description": "Update a reusable venue and its travel details; only club managers may edit it",
       "operation": "execute",
-      "sql": "UPDATE venues SET name=:name,address=:address,map_url=:map_url,notes=:notes,convenor_phone=:convenor_phone WHERE id=:venue_id AND org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=venues.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager'))",
+      "sql": "UPDATE venues SET name=:name,address=:address,map_url=:map_url,notes=:notes,convenor_phone=:convenor_phone WHERE id=:venue_id AND org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=venues.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "venue_id": {
           "type": "string"
@@ -539,9 +564,9 @@
     },
     {
       "name": "update_fixture_match_day",
-      "description": "Set a fixture match-day status and concise notice as an active club manager or administrator",
+      "description": "Set a fixture match-day status and concise notice as an active club manager, convenor or administrator",
       "operation": "execute",
-      "sql": "UPDATE fixtures SET status=:status, status_updated_at=:__now, match_notice=NULLIF(trim(:match_notice),'') WHERE id=:fixture_id AND :status IN ('scheduled','washout','heat_out','forfeit','complete') AND length(trim(:match_notice))<=280 AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=fixtures.away_team_id WHERE h.id=fixtures.home_team_id AND h.org_id=fixtures.org_id AND a.org_id=fixtures.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=fixtures.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager'))",
+      "sql": "UPDATE fixtures SET status=:status, status_updated_at=:__now, match_notice=NULLIF(trim(:match_notice),'') WHERE id=:fixture_id AND :status IN ('scheduled','washout','heat_out','forfeit','complete') AND length(trim(:match_notice))<=280 AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=fixtures.away_team_id WHERE h.id=fixtures.home_team_id AND h.org_id=fixtures.org_id AND a.org_id=fixtures.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=fixtures.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "fixture_id": {
           "type": "string",
@@ -562,7 +587,7 @@
       "name": "submit_fixture_result",
       "description": "Submit or correct a fixture result as an active club manager; each submission is retained as history",
       "operation": "execute",
-      "sql": "INSERT INTO fixture_result_submissions(id,fixture_id,submitted_by,home_score,away_score,set_results,scorecard_user_id,scorecard_path,submitted_at,correction_note) SELECT :id,f.id,:__user_id,:home_score,:away_score,:set_results,:scorecard_user_id,:scorecard_path,:__now,NULLIF(trim(:correction_note),'') FROM fixtures f WHERE f.id=:fixture_id AND :home_score>=0 AND :away_score>=0 AND length(:set_results)<=4000 AND length(trim(:correction_note))<=500 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id)",
+      "sql": "INSERT INTO fixture_result_submissions(id,fixture_id,submitted_by,home_score,away_score,set_results,scorecard_user_id,scorecard_path,submitted_at,correction_note) SELECT :id,f.id,:__user_id,:home_score,:away_score,:set_results,:scorecard_user_id,:scorecard_path,:__now,NULLIF(trim(:correction_note),'') FROM fixtures f WHERE f.id=:fixture_id AND :home_score>=0 AND :away_score>=0 AND length(:set_results)<=4000 AND length(trim(:correction_note))<=500 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id)",
       "params": {
         "id": {
           "type": "string"
@@ -597,7 +622,7 @@
       "name": "apply_fixture_result_to_fixture",
       "description": "Apply a newly inserted result submission to its fixture scores and status",
       "operation": "execute",
-      "sql": "UPDATE fixtures SET home_score=(SELECT s.home_score FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id),away_score=(SELECT s.away_score FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id),status='complete',status_updated_at=(SELECT s.submitted_at FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id) WHERE id=:fixture_id AND EXISTS (SELECT 1 FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=fixtures.id AND s.submitted_by=:__user_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=fixtures.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager'))",
+      "sql": "UPDATE fixtures SET home_score=(SELECT s.home_score FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id),away_score=(SELECT s.away_score FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id),status='complete',status_updated_at=(SELECT s.submitted_at FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=:fixture_id) WHERE id=:fixture_id AND EXISTS (SELECT 1 FROM fixture_result_submissions s WHERE s.id=:submission_id AND s.fixture_id=fixtures.id AND s.submitted_by=:__user_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=fixtures.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "submission_id": {
           "type": "string"
@@ -612,7 +637,7 @@
       "name": "list_managed_fixture_results",
       "description": "List result status and submission history for fixtures in clubs managed by caller, including missing or late scorecards",
       "operation": "query",
-      "sql": "SELECT f.id AS fixture_id,f.starts_at,f.round_label,f.status,f.home_score,f.away_score,latest.submitted_at,latest.scorecard_user_id,latest.scorecard_path,latest.correction_note,CASE WHEN latest.id IS NULL AND f.status='complete' AND CAST(strftime('%s','now') AS INTEGER)*1000 > CAST(strftime('%s',date(f.starts_at,'weekday 2','+12 hours')) AS INTEGER)*1000 THEN 'late' WHEN latest.id IS NULL THEN 'missing' WHEN latest.scorecard_path IS NULL THEN 'incomplete' WHEN latest.submitted_at > CAST(strftime('%s',date(f.starts_at,'weekday 2','+12 hours')) AS INTEGER)*1000 THEN 'late' ELSE 'submitted' END AS card_state,ht.name AS home_team_name,at.name AS away_team_name FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN fixture_result_submissions latest ON latest.id=(SELECT s.id FROM fixture_result_submissions s WHERE s.fixture_id=f.id ORDER BY s.submitted_at DESC LIMIT 1) WHERE EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) ORDER BY f.starts_at DESC",
+      "sql": "SELECT f.id AS fixture_id,f.starts_at,f.round_label,f.status,f.home_score,f.away_score,latest.submitted_at,latest.scorecard_user_id,latest.scorecard_path,latest.correction_note,CASE WHEN latest.id IS NULL AND f.status='complete' AND CAST(strftime('%s','now') AS INTEGER)*1000 > CAST(strftime('%s',date(f.starts_at,'weekday 2','+12 hours')) AS INTEGER)*1000 THEN 'late' WHEN latest.id IS NULL THEN 'missing' WHEN latest.scorecard_path IS NULL THEN 'incomplete' WHEN latest.submitted_at > CAST(strftime('%s',date(f.starts_at,'weekday 2','+12 hours')) AS INTEGER)*1000 THEN 'late' ELSE 'submitted' END AS card_state,ht.name AS home_team_name,at.name AS away_team_name FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN fixture_result_submissions latest ON latest.id=(SELECT s.id FROM fixture_result_submissions s WHERE s.fixture_id=f.id ORDER BY s.submitted_at DESC LIMIT 1) WHERE EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY f.starts_at DESC",
       "params": {},
       "requires_auth": true
     },
@@ -620,7 +645,7 @@
       "name": "list_fixture_result_history",
       "description": "Read prior result submissions for a fixture managed by caller",
       "operation": "query",
-      "sql": "SELECT s.id,s.home_score,s.away_score,s.set_results,s.scorecard_user_id,s.scorecard_path,s.submitted_at,s.correction_note,s.submitted_by FROM fixture_result_submissions s JOIN fixtures f ON f.id=s.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','manager')) ORDER BY s.submitted_at DESC",
+      "sql": "SELECT s.id,s.home_score,s.away_score,s.set_results,s.scorecard_user_id,s.scorecard_path,s.submitted_at,s.correction_note,s.submitted_by FROM fixture_result_submissions s JOIN fixtures f ON f.id=s.fixture_id WHERE f.id=:fixture_id AND EXISTS (SELECT 1 FROM teams h JOIN teams a ON a.id=f.away_team_id WHERE h.id=f.home_team_id AND h.org_id=f.org_id AND a.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY s.submitted_at DESC",
       "params": {
         "fixture_id": {
           "type": "string"

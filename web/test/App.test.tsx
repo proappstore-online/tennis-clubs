@@ -119,11 +119,11 @@ describe('fixture import role boundary', () => {
 
   it.each([
     ['manager', true],
+    ['convenor', true],
     ['admin', true],
     ['player', false],
-  ])('%s sees fixture import according to PAS manager/admin role checks', async (role, allowed) => {
-    mockApp.roles.check.mockImplementation(async (checkedRole: string) => checkedRole === role)
-    mockApp.actions.call.mockResolvedValue({ rows: [{ kind: 'team', name: 'Team A' }] })
+  ])('%s sees fixture import only when the server returns club import options', async (_role, allowed) => {
+    mockApp.actions.call.mockResolvedValue({ rows: allowed ? [{ kind: 'team', name: 'Team A' }] : [] })
     render(<FixtureImport app={mockApp as never} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Check manager access' }))
@@ -135,5 +135,6 @@ describe('fixture import role boundary', () => {
       await waitFor(() => expect(screen.getByText('This page is for club managers and admins.')).toBeTruthy())
       expect(screen.queryByText('Fixture book CSV')).toBeNull()
     }
+    expect(mockApp.roles.check).not.toHaveBeenCalled()
   })
 })

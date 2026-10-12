@@ -51,7 +51,7 @@ class AdminActionTests(unittest.TestCase):
                 self.assertTrue(TOOLS[name]["requires_auth"])
         self.assertNotIn("auth", TOOLS["create_club"])
         self.assertIn(":__user_id", TOOLS["create_club"]["sql"])
-        self.assertEqual(TOOLS["accept_team_invite"]["auth"]["app_roles"], ["player"])
+        self.assertNotIn("auth", TOOLS["accept_team_invite"])
 
     def test_club_creation_records_authenticated_creator(self):
         self.db.execute(TOOLS["create_club"]["sql"], {
