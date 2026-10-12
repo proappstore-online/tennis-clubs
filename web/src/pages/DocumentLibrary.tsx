@@ -67,7 +67,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
   return <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
     <h1 className="display-font text-3xl font-bold text-[var(--ink)]">Documents</h1>
     <p className="mt-2 text-sm text-[var(--muted)]">Club guidance and documents. You see only the documents your role and team allow. Contact details are never included.</p>
-    <p className="mt-3 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">File downloads and uploads are not available yet. They need an app worker, which the platform has not enabled for this app. Document records, who may see them and the access checks are live.</p>
+    <p className="mt-3 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">File downloads and uploads are not available yet and will be added in a later update. Document records, who may see them and the access checks are live.</p>
     {error && <p className="mt-5 rounded-xl bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]" role="alert">{error}</p>}
     {loading && <p className="mt-5 text-sm text-[var(--muted)]" role="status">Loading…</p>}
     {!loading && clubs.length === 0 && <p className="mt-5 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">You are not a member of a club yet.</p>}
@@ -87,7 +87,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
       {document.description && <p className="mt-1 text-sm text-[var(--ink)]">{document.description}</p>}
       <p className="mt-2 text-xs text-[var(--muted)]">Source: {document.source_attribution} · Effective {document.effective_on}{document.revision ? ` · Revision ${document.revision}` : ''}{document.expires_on ? ` · Expires ${document.expires_on}` : ''}</p>
       <p className="mt-1 text-xs font-semibold text-[var(--muted)]">{document.status === 'stored' ? 'File stored; download not yet available' : 'File not yet available'}</p>
-      {document.status === 'stored' && <button type="button" disabled title="Downloads need an app worker, which is not enabled yet" className="mt-3 min-h-11 rounded-xl border border-[var(--line)] px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60">Download unavailable</button>}
+      {document.status === 'stored' && <button type="button" disabled title="Downloads are not available yet" className="mt-3 min-h-11 rounded-xl border border-[var(--line)] px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60">Download unavailable</button>}
     </li>)}</ul>
   </main>
 }

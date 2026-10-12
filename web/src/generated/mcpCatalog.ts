@@ -747,7 +747,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "create_team_invite",
-    "description": "Create a pending scoped team membership for a PAS invite",
+    "description": "Create a pending team membership for an invite link",
     "operation": "execute",
     "roles": [
       "admin",
@@ -777,7 +777,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "accept_team_invite",
-    "description": "Accept a team membership using its one-time token; the caller needs no PAS app role",
+    "description": "Accept a team membership using its one-time token",
     "operation": "execute",
     "roles": [],
     "access": "claim-token",

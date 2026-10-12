@@ -501,7 +501,7 @@ Returns: `changes`: rows written; 0 means not applied.
 
 ### `create_team_invite`
 
-Create a pending scoped team membership for a PAS invite
+Create a pending team membership for an invite link
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: not-idempotent. Audit: record with `record_audit_event`.
@@ -516,7 +516,7 @@ Returns: `changes`: rows written; 0 means not applied.
 
 ### `accept_team_invite`
 
-Accept a team membership using its one-time token; the caller needs no PAS app role
+Accept a team membership using its one-time token
 
 - Access: claim-token; roles: none (see access); audience: invitee.
 - Idempotency: idempotent. Audit: not required.

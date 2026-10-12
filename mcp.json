@@ -753,7 +753,7 @@
     },
     {
       "name": "create_team_invite",
-      "description": "Create a pending scoped team membership for a PAS invite",
+      "description": "Create a pending team membership for an invite link",
       "operation": "execute",
       "sql": "INSERT INTO team_memberships (id,org_id,team_id,invite_token,created_by,created_at) SELECT :id,t.org_id,t.id,:invite_token,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND t.is_external=0 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
@@ -785,7 +785,7 @@
     },
     {
       "name": "accept_team_invite",
-      "description": "Accept a team membership using its one-time token; the caller needs no PAS app role",
+      "description": "Accept a team membership using its one-time token",
       "operation": "execute",
       "sql": "UPDATE team_memberships SET user_id=:__user_id,display_name=:display_name,invite_token=NULL,accepted_at=:__now WHERE invite_token=:claim_token AND user_id IS NULL",
       "params": {

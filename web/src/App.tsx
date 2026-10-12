@@ -62,13 +62,13 @@ function TeamInviteAcceptance({ app: inviteApp, code }: { app: typeof app; code:
       try {
         const invite = await inviteApp.invites.redeem(code)
         const token = typeof invite.metadata?.claimToken === 'string' ? invite.metadata.claimToken : ''
-        if (!token) throw new Error('This invitation does not include a team membership. Ask the manager for a fresh link.')
+        if (!token) { if (active) setMessage('This invite link does not include a team membership. Ask the club for a fresh link.'); return }
         const displayName = inviteApp.auth.user?.login ?? 'Team member'
         await inviteApp.actions.call('activate_invited_club_membership', { id: crypto.randomUUID(), claim_token: token, display_name: displayName })
         await inviteApp.actions.call('accept_team_invite', { claim_token: token, display_name: displayName })
         if (active) setMessage('You have joined the team. Open Club setup to view your fixtures.')
-      } catch (error) {
-        if (active) setMessage(error instanceof Error ? error.message : 'The invitation could not be accepted.')
+      } catch {
+        if (active) setMessage('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')
       }
     })()
     return () => { active = false }

@@ -29,9 +29,9 @@ describe('document library', () => {
     expect(screen.queryByLabelText('Upload file')).toBeNull()
   })
 
-  it('explains that downloads and uploads depend on the app worker', async () => {
+  it('explains that file downloads and uploads are not available yet', async () => {
     render(<DocumentLibrary app={appWith({ list_my_clubs: { rows: [] } })} />)
-    expect(await screen.findByText(/need an app worker/)).toBeTruthy()
+    expect(await screen.findByText(/File downloads and uploads are not available yet/)).toBeTruthy()
   })
 
   it('shows an empty state when the caller belongs to no club', async () => {
