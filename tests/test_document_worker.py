@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKER = ROOT / "worker" / "src" / "app.js"
+WORKER = ROOT / "worker-src" / "src" / "app.js"
 MCP = {tool["name"]: tool for tool in json.loads((ROOT / "mcp.json").read_text())["tools"]}
 
 # Fake placeholder bytes: no real document is used or stored in this repository.
