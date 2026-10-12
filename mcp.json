@@ -3574,6 +3574,35 @@
         "versioned": true,
         "redacts": []
       }
+    },
+    {
+      "name": "check_document_upload",
+      "description": "Authorise storing a registered document's file: returns the registered size, type and hash only to the managers allowed to store it",
+      "operation": "query",
+      "sql": "SELECT documents.id,documents.content_type,documents.byte_size,documents.sha256 FROM documents WHERE documents.id=:document_id AND documents.org_id=:org_id AND documents.status='registered' AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (documents.visibility<>'admin' OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=documents.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin')))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "document_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
     }
   ]
 }

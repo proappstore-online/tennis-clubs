@@ -3445,5 +3445,31 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "min": 0
       }
     ]
+  },
+  {
+    "name": "check_document_upload",
+    "description": "Authorise storing a registered document's file: returns the registered size, type and hash only to the managers allowed to store it",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "document_id",
+        "type": "string"
+      }
+    ]
   }
 ]

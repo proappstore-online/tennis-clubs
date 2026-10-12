@@ -68,7 +68,7 @@ Atomicity: the platform runs one SQL statement per action, so the steps are not 
 
 Club documents are stored as records in `documents` with title, description, category (guidance, behaviour, etiquette, competition, roster or other), source attribution, effective and revision dates, optional expiry, and a scope of club, season, team or competition. Visibility is one of public (any signed-in user), member (active club members), team (members of the document's team, or managers), manager (managers, convenors and admins) or admin (admins only). `check_document_access` returns a document only when it is stored, not withdrawn, not expired and visible to the caller, using the same rule as `list_documents`, so listing and download authorisation cannot disagree. Registering, changing, withdrawing and storing are manager actions that never let a manager set or change a level above their own. Every change is appended to `document_history` and every view or download attempt to `document_access_log`, both with the actor.
 
-Limit: this repository stores metadata and the authorisation decision only. Serving file bytes needs an app worker proxy (`/.pas/worker/...`) that calls `check_document_access` as the signed-in user and then reads the file from the worker storage namespace; that worker is not deployed here, so no download link is offered yet. Storage keys and uploader identities are never returned by any list action.
+File bytes are served by the app worker in `worker/` at `/.pas/worker/documents/<id>/download?org=<club>` (GET) and accept uploads at `/.pas/worker/documents/<id>/upload?org=<club>` (POST, manager only). The worker runs every action as the signed-in user, so the SQL gates decide access: `check_document_access` before any download, and `check_document_upload` before any upload. An upload must match the registered content type, size and SHA-256 before its bytes are stored under `docs/<club>/<id>`; each download is checked against the stored hash and logged. Refusals to members do not reveal whether a document exists. Storage keys and uploader identities are never returned by any list action.
 
 ## Redaction
 
@@ -176,6 +176,7 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_document_history` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_document_access_log` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_my_clubs` | query | `member` | member | read-only | no | yes | yes |
+| `check_document_upload` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
 
 ### `list_my_fixtures`
 
@@ -1640,3 +1641,17 @@ List the clubs the caller actively belongs to, with the caller's role in each; a
 | `offset` | integer; default 0; min 0 |
 
 Returns: `id`, `name`, `role`, `updated_at`
+
+### `check_document_upload`
+
+Authorise storing a registered document's file: returns the registered size, type and hash only to the managers allowed to store it
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `document_id` | string |
+
+Returns: `id`, `content_type`, `byte_size`, `sha256`
