@@ -166,7 +166,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
         <label className="text-sm font-semibold text-[var(--ink)]">Effective date<input aria-label="Effective date" type="date" required value={form.effective} onChange={(event) => setForm({ ...form, effective: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3" /></label>
         <label className="text-sm font-semibold text-[var(--ink)] sm:col-span-2">Description (optional)<input aria-label="Document description" maxLength={300} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3" /></label>
       </div>
-      <button type="submit" disabled={busy} className="mt-4 min-h-11 rounded-xl bg-[var(--accent)] px-5 font-semibold text-white disabled:opacity-50">{busy ? 'Adding…' : 'Add document'}</button>
+      <button type="submit" aria-label="Add document" disabled={busy} className="mt-4 min-h-11 rounded-xl bg-[var(--accent)] px-5 font-semibold text-white disabled:opacity-50">{busy ? 'Adding…' : 'Add document'}</button>
     </form>}
 
     {clubId && <fieldset className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -184,7 +184,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
       {item.description && <p className="mt-1 text-sm text-[var(--ink)]">{item.description}</p>}
       <p className="mt-2 text-xs text-[var(--muted)]">Source: {item.source_attribution} · Effective {item.effective_on}{item.revision ? ` · Revision ${item.revision}` : ''}{item.expires_on ? ` · Expires ${item.expires_on}` : ''}</p>
       <p className="mt-1 text-xs font-semibold text-[var(--muted)]">{item.status === 'stored' ? 'File available' : 'File not yet uploaded'}</p>
-      {item.status === 'stored' && <button type="button" disabled={downloadingId === item.id} onClick={() => void download(item)} className="mt-3 min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] disabled:opacity-60">{downloadingId === item.id ? 'Preparing…' : 'Download'}</button>}
+      {item.status === 'stored' && <button type="button" aria-label={`Download ${item.title}`} disabled={downloadingId === item.id} onClick={() => void download(item)} className="mt-3 min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-semibold text-[var(--ink)] disabled:opacity-60">{downloadingId === item.id ? 'Preparing…' : 'Download'}</button>}
       {item.status === 'registered' && canManage && <label className="mt-3 block text-sm font-semibold text-[var(--ink)]">Upload file<input aria-label={`Upload file for ${item.title}`} type="file" accept={DOCUMENT_ACCEPT} disabled={busy} className="mt-1 block w-full text-sm" onChange={(event) => void uploadExisting(item, event.target.files?.[0])} /></label>}
     </li>)}</ul>
   </main>

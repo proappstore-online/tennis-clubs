@@ -37,7 +37,7 @@ describe('document library', () => {
       list_documents: { rows: [{ ...base, id: 'd1', title: 'Parent guidance', status: 'stored' }, { ...base, id: 'd2', title: 'Roster rules', status: 'registered' }] },
     })
     render(<DocumentLibrary app={app} />)
-    expect(await screen.findByRole('button', { name: 'Download' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /^Download / })).toBeTruthy()
     expect(screen.queryByLabelText('Document title')).toBeNull()
     expect(screen.queryByLabelText(/Upload file for/)).toBeNull()
   })
@@ -125,13 +125,13 @@ describe('document downloads', () => {
 
   it('fetches the file through the worker for an authorised member and saves it under its title', async () => {
     const app = appWith(clubs) as unknown as { worker: { fetch: ReturnType<typeof vi.fn> } }
-    app.worker.fetch.mockResolvedValue(new Response(new Blob(['placeholder']), { status: 200, headers: { 'content-disposition': 'attachment; filename="Parent guidance"' } }))
+    app.worker.fetch.mockResolvedValue(new Response('placeholder', { status: 200, headers: { 'content-disposition': 'attachment; filename="Parent guidance"' } }))
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn() }))
     const clicked: string[] = []
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicked.push(this.download) })
 
     render(<DocumentLibrary app={app as never} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Download / }))
     await waitFor(() => expect(clicked).toEqual(['Parent guidance']))
     expect(app.worker.fetch).toHaveBeenCalledWith('/documents/d1/download?org=a')
   })
@@ -140,14 +140,14 @@ describe('document downloads', () => {
     const app = appWith(clubs) as unknown as { worker: { fetch: ReturnType<typeof vi.fn> } }
     app.worker.fetch.mockResolvedValue(new Response('not found', { status: 404 }))
     render(<DocumentLibrary app={app as never} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Download / }))
     expect(await screen.findByText('You cannot download this document, or it is no longer available.')).toBeTruthy()
   })
 
   it('offers no download for a document whose file is not uploaded', async () => {
     render(<DocumentLibrary app={appWith({ ...clubs, list_documents: { rows: [{ ...stored, status: 'registered' }] } })} />)
     expect(await screen.findByText('File not yet uploaded')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Download / })).toBeNull()
   })
 })
 
