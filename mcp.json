@@ -4,7 +4,7 @@
       "name": "list_my_fixtures",
       "description": "List upcoming fixtures for teams the authenticated caller has joined",
       "operation": "query",
-      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,ht.name AS home_team_name,at.name AS away_team_name,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,v.notes AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN f.home_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'home' WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN 'away' END AS member_side,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.name ELSE CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END END AS opponent_name,CASE WHEN f.away_team_id IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) AND f.home_team_id NOT IN (SELECT tp.team_id FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 UNION SELECT tm.team_id FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL) THEN ht.is_external ELSE at.is_external END AS is_external_opponent,d.name AS division_name,v.name AS venue_name,v.address AS venue_address,v.map_url,v.notes AS venue_notes,(SELECT fr.availability FROM fixture_roster fr WHERE fr.fixture_id=f.id AND fr.user_id=:__user_id) AS my_availability FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id LEFT JOIN divisions d ON d.id=f.division_id LEFT JOIN venues v ON v.id=f.venue_id WHERE f.starts_at>=:from AND ht.org_id=f.org_id AND at.org_id=f.org_id AND (EXISTS (SELECT 1 FROM team_players tp WHERE tp.user_id=:__user_id AND tp.is_active=1 AND tp.team_id IN(f.home_team_id,f.away_team_id)) OR EXISTS (SELECT 1 FROM team_memberships tm WHERE tm.user_id=:__user_id AND tm.accepted_at IS NOT NULL AND tm.team_id IN(f.home_team_id,f.away_team_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=tm.team_id AND t.org_id=f.org_id))) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "from": {
           "type": "string"
@@ -134,9 +134,9 @@
     },
     {
       "name": "list_fixture_import_options",
-      "description": "List teams and venues for clubs where the signed-in user is a manager, convenor or admin",
+      "description": "List internal teams, venues and external opponent clubs (placeholder team id, canonical name and normalised aliases) for clubs where the signed-in user is a manager, convenor or admin",
       "operation": "query",
-      "sql": "SELECT 'team' AS kind, t.id, t.name, t.org_id, t.division_id, s.name AS season_name FROM teams t LEFT JOIN divisions d ON d.id = t.division_id LEFT JOIN seasons s ON s.id = d.season_id WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) UNION ALL SELECT 'venue' AS kind, v.id, v.name, v.org_id, NULL AS division_id, NULL AS season_name FROM venues v WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = v.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY kind, name, id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT 'team' AS kind, t.id, t.name, t.org_id, t.division_id, s.name AS season_name, NULL AS aliases FROM teams t LEFT JOIN divisions d ON d.id = t.division_id LEFT JOIN seasons s ON s.id = d.season_id WHERE t.is_external = 0 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=t.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) UNION ALL SELECT 'venue' AS kind, v.id, v.name, v.org_id, NULL AS division_id, NULL AS season_name, NULL AS aliases FROM venues v WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=v.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) UNION ALL SELECT 'external_club' AS kind, t.id, ec.canonical_name, ec.org_id, NULL AS division_id, NULL AS season_name, (SELECT group_concat(a.normalized_alias, '|') FROM external_club_aliases a WHERE a.external_club_id = ec.id) AS aliases FROM external_clubs ec JOIN teams t ON t.external_club_id = ec.id AND t.is_external = 1 WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=ec.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY kind, name, id LIMIT :limit OFFSET :offset",
       "params": {
         "limit": {
           "type": "integer",
@@ -170,7 +170,7 @@
       "name": "upsert_imported_fixture",
       "description": "Create or update a fixture in a club managed by the signed-in user",
       "operation": "execute",
-      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now",
+      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND t.is_external = 0 AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND v.org_id = :org_id) AND julianday(:starts_at) IS NOT NULL ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now",
       "params": {
         "id": {
           "type": "string"
@@ -448,7 +448,7 @@
       "name": "list_club_teams",
       "description": "List club administration records for authorised managers",
       "operation": "query",
-      "sql": "SELECT t.id,t.org_id,t.name,t.colour,t.division_id,d.name AS division_name,s.name AS season_name,t.created_at AS updated_at FROM teams t LEFT JOIN divisions d ON d.id=t.division_id LEFT JOIN seasons s ON s.id=d.season_id WHERE t.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND (:division_id IS NULL OR t.division_id=:division_id) ORDER BY t.name, t.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT t.id,t.org_id,t.name,t.colour,t.division_id,d.name AS division_name,s.name AS season_name,t.created_at AS updated_at FROM teams t LEFT JOIN divisions d ON d.id=t.division_id LEFT JOIN seasons s ON s.id=d.season_id WHERE t.org_id=:org_id AND t.is_external=0 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) AND (:division_id IS NULL OR t.division_id=:division_id) ORDER BY t.name, t.id LIMIT :limit OFFSET :offset",
       "params": {
         "org_id": {
           "type": "string"
@@ -727,7 +727,7 @@
       "name": "create_team_invite",
       "description": "Create a pending scoped team membership for a PAS invite",
       "operation": "execute",
-      "sql": "INSERT INTO team_memberships (id,org_id,team_id,invite_token,created_by,created_at) SELECT :id,t.org_id,t.id,:invite_token,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO team_memberships (id,org_id,team_id,invite_token,created_by,created_at) SELECT :id,t.org_id,t.id,:invite_token,:__user_id,:__now FROM teams t WHERE t.id=:team_id AND t.is_external=0 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = t.org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -838,7 +838,7 @@
       "name": "list_managed_fixtures",
       "description": "List fixtures managed by the caller with roster reply totals",
       "operation": "query",
-      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,ht.name AS home_team_name,at.name AS away_team_name,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
+      "sql": "SELECT f.id,f.org_id,COALESCE(f.updated_at,f.created_at) AS updated_at,f.starts_at,f.round_label,f.status,f.status_updated_at,f.match_notice,f.home_score,f.away_score,ht.name AS home_team_name,at.name AS away_team_name,CASE WHEN at.is_external=1 THEN ec.canonical_name ELSE at.name END AS opponent_name,at.is_external AS is_external_opponent,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='in') AS in_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='out') AS out_count,(SELECT COUNT(*) FROM fixture_roster r WHERE r.fixture_id=f.id AND r.availability='pending') AS pending_count FROM fixtures f JOIN teams ht ON ht.id=f.home_team_id JOIN teams at ON at.id=f.away_team_id LEFT JOIN external_clubs ec ON ec.id=at.external_club_id WHERE EXISTS (SELECT 1 FROM teams home_owned WHERE home_owned.id=f.home_team_id AND home_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM teams away_owned WHERE away_owned.id=f.away_team_id AND away_owned.org_id=f.org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=f.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND (:status IS NULL OR f.status=:status) ORDER BY f.starts_at, f.id LIMIT :limit OFFSET :offset",
       "params": {
         "limit": {
           "type": "integer",
@@ -1511,7 +1511,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('bootstrap_club_admin', 'create_season', 'create_division', 'create_venue', 'update_venue', 'create_team', 'create_team_invite', 'add_fixture_roster_player', 'remove_fixture_roster_player', 'update_fixture_match_day', 'submit_fixture_result', 'apply_fixture_result_to_fixture', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_fixture_result_to_fixture', 'bootstrap_club_admin', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'remove_fixture_roster_player', 'schedule_fixture', 'set_external_club_home_venue', 'submit_fixture_result', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1522,15 +1522,20 @@
         "action": {
           "type": "string",
           "enum": [
+            "add_external_club_alias",
             "add_fixture_roster_player",
             "apply_fixture_result_to_fixture",
             "bootstrap_club_admin",
             "create_division",
+            "create_external_club",
+            "create_external_club_placeholder",
             "create_season",
             "create_team",
             "create_team_invite",
             "create_venue",
             "remove_fixture_roster_player",
+            "schedule_fixture",
+            "set_external_club_home_venue",
             "submit_fixture_result",
             "update_fixture_match_day",
             "update_venue",
@@ -1612,6 +1617,222 @@
           "scorecard_user_id",
           "submitted_by"
         ]
+      }
+    },
+    {
+      "name": "create_external_club",
+      "description": "Create an external opponent club owned by this club; the canonical name is trimmed and normalised for matching",
+      "operation": "execute",
+      "sql": "INSERT INTO external_clubs (id,org_id,canonical_name,normalized_name,created_at,updated_at) SELECT :id,:org_id,trim(:canonical_name),trim(replace(replace(replace(lower(:canonical_name),'  ',' '),'  ',' '),'  ',' ')),:__now,:__now WHERE length(trim(replace(replace(replace(lower(:canonical_name),'  ',' '),'  ',' '),'  ',' ')))>0 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "canonical_name": {
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "create_external_club_placeholder",
+      "description": "Create the internal placeholder team that stands for an external club in fixtures; at most one per external club",
+      "operation": "execute",
+      "sql": "INSERT INTO teams (id,org_id,division_id,name,colour,created_at,external_club_id,is_external) SELECT :id,ec.org_id,NULL,ec.canonical_name,NULL,:__now,ec.id,1 FROM external_clubs ec WHERE ec.id=:external_club_id AND ec.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(org_id,external_club_id) WHERE external_club_id IS NOT NULL DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "external_club_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "add_external_club_alias",
+      "description": "Add an alias that import matching may use for an external club; aliases are unique within a club and cannot repeat another external club's canonical name there",
+      "operation": "execute",
+      "sql": "INSERT INTO external_club_aliases (id,org_id,external_club_id,alias,normalized_alias,created_at) SELECT :id,ec.org_id,ec.id,trim(:alias),trim(replace(replace(replace(lower(:alias),'  ',' '),'  ',' '),'  ',' ')),:__now FROM external_clubs ec WHERE ec.id=:external_club_id AND ec.org_id=:org_id AND length(trim(replace(replace(replace(lower(:alias),'  ',' '),'  ',' '),'  ',' ')))>0 AND instr(:alias,'|')=0 AND NOT EXISTS (SELECT 1 FROM external_clubs x WHERE x.org_id=ec.org_id AND x.normalized_name=trim(replace(replace(replace(lower(:alias),'  ',' '),'  ',' '),'  ',' '))) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "external_club_id": {
+          "type": "string"
+        },
+        "alias": {
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "set_external_club_home_venue",
+      "description": "Set the home venue of an external club to a venue owned by this club",
+      "operation": "execute",
+      "sql": "UPDATE external_clubs SET home_venue_id=:venue_id,updated_at=:__now WHERE id=:external_club_id AND org_id=:org_id AND EXISTS (SELECT 1 FROM venues v WHERE v.id=:venue_id AND v.org_id=:org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "external_club_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_external_clubs",
+      "description": "List external opponent clubs for a club with their aliases and home venue name; any active club member may read",
+      "operation": "query",
+      "sql": "SELECT ec.id,ec.org_id,ec.canonical_name,ec.normalized_name,ec.home_venue_id,v.name AS home_venue_name,(SELECT group_concat(a.alias,'|') FROM external_club_aliases a WHERE a.external_club_id=ec.id) AS aliases,ec.created_at,COALESCE(ec.updated_at,ec.created_at) AS updated_at FROM external_clubs ec LEFT JOIN venues v ON v.id=ec.home_venue_id WHERE ec.org_id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=ec.org_id AND cm.user_id=:__user_id AND cm.is_active=1) ORDER BY ec.canonical_name, ec.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-member",
+        "roles": [],
+        "audience": "member",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
+        "redacts": []
+      }
+    },
+    {
+      "name": "schedule_fixture",
+      "description": "Schedule a fixture between an internal home team and an internal or external away team of the same club",
+      "operation": "execute",
+      "sql": "INSERT INTO fixtures (id,org_id,division_id,home_team_id,away_team_id,venue_id,starts_at,round_label,status,created_at) SELECT :id,:org_id,:division_id,:home_team_id,:away_team_id,:venue_id,:starts_at,:round_label,'scheduled',:__now WHERE :home_team_id<>:away_team_id AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:home_team_id AND t.org_id=:org_id AND t.is_external=0) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=:away_team_id AND t.org_id=:org_id) AND (:venue_id IS NULL OR EXISTS (SELECT 1 FROM venues v WHERE v.id=:venue_id AND v.org_id=:org_id)) AND (:division_id IS NULL OR EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=:division_id AND s.org_id=:org_id)) AND julianday(:starts_at) IS NOT NULL AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "division_id": {
+          "type": "string",
+          "default": null
+        },
+        "home_team_id": {
+          "type": "string"
+        },
+        "away_team_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string",
+          "default": null
+        },
+        "starts_at": {
+          "type": "string"
+        },
+        "round_label": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
       }
     }
   ]

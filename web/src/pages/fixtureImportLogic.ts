@@ -1,5 +1,9 @@
-export type FixtureOption = { kind: 'team' | 'venue'; id: string; name: string; org_id: string; division_id?: string | null; season_name?: string | null }
+export type FixtureOption = { kind: 'team' | 'venue' | 'external_club'; id: string; name: string; org_id: string; division_id?: string | null; season_name?: string | null; aliases?: string | null }
 export type FixtureRow = { date: string; round: string; opponent: string; home_away: string; venue: string; team: string; season: string; org_id?: string; division_id?: string | null; home_team_id?: string; away_team_id?: string; venue_id?: string; issue?: string }
+
+export function normalizeClubName(value: string): string {
+  return value.toLowerCase().replace(/ +/g, ' ').trim()
+}
 
 export function parseCsv(text: string): Record<string, string>[] {
   const lines: string[][] = []
@@ -48,9 +52,12 @@ export function melbourneFixtureStart(date: string): string {
 export function mapFixtureRows(parsed: Record<string, string>[], options: FixtureOption[]): FixtureRow[] {
   const teams = options.filter((item) => item.kind === 'team')
   const venues = options.filter((item) => item.kind === 'venue')
+  const externalClubs = options.filter((item) => item.kind === 'external_club')
   const mapped = parsed.map((row) => {
     const team = teams.find((item) => item.name.toLowerCase() === row.team.trim().toLowerCase())
+    const opponentKey = normalizeClubName(row.opponent ?? '')
     const opponent = teams.find((item) => item.name.toLowerCase() === row.opponent.trim().toLowerCase() && item.org_id === team?.org_id)
+      ?? externalClubs.find((item) => item.org_id === team?.org_id && [normalizeClubName(item.name), ...(item.aliases ?? '').split('|').filter(Boolean)].includes(opponentKey))
     const venue = venues.find((item) => item.name.toLowerCase() === row.venue.trim().toLowerCase() && item.org_id === team?.org_id)
     const date = normalizeDate(row.date)
     const problems = [!date && 'invalid date', !row.round?.trim() && 'missing round', !row.opponent?.trim() && 'missing opponent', !['home', 'away'].includes(row.home_away?.trim().toLowerCase()) && 'home_away must be home or away', !row.team?.trim() && 'missing team', !row.venue?.trim() && 'missing venue', !row.season?.trim() && 'missing season', row.team && !team && 'team not found', row.opponent && team && !opponent && 'opponent team not found', row.venue && team && !venue && 'venue not found', team && team.season_name?.toLowerCase() !== row.season.trim().toLowerCase() && 'team is not assigned to this season'].filter(Boolean)

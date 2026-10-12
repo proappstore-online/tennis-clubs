@@ -113,6 +113,14 @@ class AdminActionTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in foreign_rows], ["fixture-b"])
         outsider = self.db.execute(TOOLS["list_my_fixtures"]["sql"], {"__user_id": "outsider", "from": "2026-01-01", "limit": 50}).fetchall()
         self.assertEqual(outsider, [])
+        # The cross-club fixture stays hidden; an external opponent placeholder owned by club-a is visible to club-a's team members.
+        self.db.execute("INSERT INTO external_clubs(id,org_id,canonical_name,normalized_name,created_at) VALUES('rival','club-a','Rival Club','rival club',1)")
+        self.db.execute("INSERT INTO teams(id,org_id,name,created_at,external_club_id,is_external) VALUES('rival-placeholder','club-a','Rival Club',1,'rival',1)")
+        self.db.execute("INSERT INTO fixtures(id,org_id,division_id,home_team_id,away_team_id,starts_at,created_at) VALUES('fixture-ext','club-a','division-a','team-a','rival-placeholder','2026-10-04T09:00:00+10:00',1)")
+        visible = self.db.execute(TOOLS["list_my_fixtures"]["sql"], {"__user_id": "player-a", "from": "2026-01-01", "limit": 50}).fetchall()
+        self.assertEqual([row["id"] for row in visible], ["fixture-a", "fixture-ext"])
+        self.assertEqual(visible[1]["opponent_name"], "Rival Club")
+        self.assertEqual(visible[1]["member_side"], "home")
 
     def test_player_fixture_reads_do_not_select_private_contacts(self):
         sql = TOOLS["list_my_fixtures"]["sql"].lower()

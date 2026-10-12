@@ -70,8 +70,12 @@ class FixtureResultTests(unittest.TestCase):
         # Simulate a legacy/imported fixture that bypassed current write validation.
         self.db.execute("INSERT INTO fixtures(id,org_id,home_team_id,away_team_id,starts_at,created_at) VALUES('bad','club','foreign-home','foreign-away','2026-10-12T09:00:00+11:00',1)")
         self.db.execute("INSERT INTO fixture_result_submissions(id,fixture_id,submitted_by,home_score,away_score,submitted_at,scorecard_path) VALUES('private','bad','manager',6,0,2,'private-scorecard.pdf')")
+        # An external opponent is a placeholder team owned by this club, so its fixture stays visible.
+        self.db.execute("INSERT INTO external_clubs(id,org_id,canonical_name,normalized_name,created_at) VALUES('rival','club','Rival Club','rival club',1)")
+        self.db.execute("INSERT INTO teams(id,org_id,name,created_at,external_club_id,is_external) VALUES('rival-placeholder','club','Rival Club',1,'rival',1)")
+        self.db.execute("INSERT INTO fixtures(id,org_id,home_team_id,away_team_id,starts_at,created_at) VALUES('ext','club','home','rival-placeholder','2026-10-13T09:00:00+11:00',1)")
         params = {"__user_id": "manager"}
-        self.assertEqual([row["fixture_id"] for row in self.db.execute(TOOLS["list_managed_fixture_results"]["sql"], params)], ["f"])
+        self.assertEqual(sorted(row["fixture_id"] for row in self.db.execute(TOOLS["list_managed_fixture_results"]["sql"], params)), ["ext", "f"])
         history = self.db.execute(TOOLS["list_fixture_result_history"]["sql"], {**params, "fixture_id": "bad"}).fetchall()
         self.assertEqual(history, [])
 

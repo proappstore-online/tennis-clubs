@@ -141,7 +141,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "list_fixture_import_options",
-    "description": "List teams and venues for clubs where the signed-in user is a manager, convenor or admin",
+    "description": "List internal teams, venues and external opponent clubs (placeholder team id, canonical name and normalised aliases) for clubs where the signed-in user is a manager, convenor or admin",
     "operation": "query",
     "roles": [
       "admin",
@@ -1471,15 +1471,20 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "action",
         "type": "string",
         "enum": [
+          "add_external_club_alias",
           "add_fixture_roster_player",
           "apply_fixture_result_to_fixture",
           "bootstrap_club_admin",
           "create_division",
+          "create_external_club",
+          "create_external_club_placeholder",
           "create_season",
           "create_team",
           "create_team_invite",
           "create_venue",
           "remove_fixture_roster_player",
+          "schedule_fixture",
+          "set_external_club_home_venue",
           "submit_fixture_result",
           "update_fixture_match_day",
           "update_venue",
@@ -1543,6 +1548,214 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "type": "integer",
         "default": 0,
         "min": 0
+      }
+    ]
+  },
+  {
+    "name": "create_external_club",
+    "description": "Create an external opponent club owned by this club; the canonical name is trimmed and normalised for matching",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "canonical_name",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "create_external_club_placeholder",
+    "description": "Create the internal placeholder team that stands for an external club in fixtures; at most one per external club",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "external_club_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "add_external_club_alias",
+    "description": "Add an alias that import matching may use for an external club; aliases are unique within a club and cannot repeat another external club's canonical name there",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "external_club_id",
+        "type": "string"
+      },
+      {
+        "name": "alias",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "set_external_club_home_venue",
+    "description": "Set the home venue of an external club to a venue owned by this club",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "external_club_id",
+        "type": "string"
+      },
+      {
+        "name": "venue_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_external_clubs",
+    "description": "List external opponent clubs for a club with their aliases and home venue name; any active club member may read",
+    "operation": "query",
+    "roles": [],
+    "access": "club-member",
+    "audience": "member",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "schedule_fixture",
+    "description": "Schedule a fixture between an internal home team and an internal or external away team of the same club",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "division_id",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "home_team_id",
+        "type": "string"
+      },
+      {
+        "name": "away_team_id",
+        "type": "string"
+      },
+      {
+        "name": "venue_id",
+        "type": "string",
+        "default": null
+      },
+      {
+        "name": "starts_at",
+        "type": "string"
+      },
+      {
+        "name": "round_label",
+        "type": "string",
+        "default": null
       }
     ]
   }

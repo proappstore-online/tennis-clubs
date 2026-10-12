@@ -43,6 +43,10 @@
     {
       "name": "0008_mcp_contract",
       "sql": "CREATE TABLE IF NOT EXISTS import_runs (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), actor_user_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('fixtures','roster')), received_count INTEGER NOT NULL CHECK(received_count>=0), saved_count INTEGER NOT NULL CHECK(saved_count>=0), rejected_count INTEGER NOT NULL DEFAULT 0 CHECK(rejected_count>=0), status TEXT NOT NULL CHECK(status IN ('saved','rejected')), created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_import_runs_org ON import_runs(org_id, created_at DESC); CREATE TABLE IF NOT EXISTS audit_events (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), actor_user_id TEXT NOT NULL, action TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT, outcome TEXT NOT NULL CHECK(outcome IN ('succeeded','refused')), created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_audit_events_org ON audit_events(org_id, created_at DESC); ALTER TABLE fixtures ADD COLUMN updated_at INTEGER; ALTER TABLE venues ADD COLUMN updated_at INTEGER"
+    },
+    {
+      "name": "0009_external_clubs",
+      "sql": "CREATE TABLE IF NOT EXISTS external_clubs (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), canonical_name TEXT NOT NULL, normalized_name TEXT NOT NULL, home_venue_id TEXT REFERENCES venues(id), created_at INTEGER NOT NULL, updated_at INTEGER, UNIQUE(org_id, normalized_name)); CREATE TABLE IF NOT EXISTS external_club_aliases (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), external_club_id TEXT NOT NULL REFERENCES external_clubs(id), alias TEXT NOT NULL, normalized_alias TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE(org_id, normalized_alias)); ALTER TABLE teams ADD COLUMN external_club_id TEXT REFERENCES external_clubs(id); ALTER TABLE teams ADD COLUMN is_external INTEGER NOT NULL DEFAULT 0; CREATE UNIQUE INDEX IF NOT EXISTS teams_one_placeholder_per_external_club ON teams(org_id, external_club_id) WHERE external_club_id IS NOT NULL"
     }
   ]
 }

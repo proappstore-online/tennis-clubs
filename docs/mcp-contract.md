@@ -110,6 +110,12 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_audit_events` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `record_audit_event` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | no | no | no |
 | `list_authorised_documents` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
+| `create_external_club` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
+| `create_external_club_placeholder` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `add_external_club_alias` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
+| `set_external_club_home_venue` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `list_external_clubs` | query | `club-member` | member | read-only | no | yes | yes |
+| `schedule_fixture` | execute | `admin`, `convenor`, `manager` | manager | not-idempotent | yes | no | no |
 
 ### `list_my_fixtures`
 
@@ -125,7 +131,7 @@ List upcoming fixtures for teams the authenticated caller has joined
 | `limit` | integer; default 20; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
+Returns: `id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
 
 ### `list_fixture_roster`
 
@@ -174,7 +180,7 @@ Returns: `changes`: rows written; 0 means not applied.
 
 ### `list_fixture_import_options`
 
-List teams and venues for clubs where the signed-in user is a manager, convenor or admin
+List internal teams, venues and external opponent clubs (placeholder team id, canonical name and normalised aliases) for clubs where the signed-in user is a manager, convenor or admin
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: read-only. Audit: not required.
@@ -184,7 +190,7 @@ List teams and venues for clubs where the signed-in user is a manager, convenor 
 | `limit` | integer; default 100; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`
+Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`, `aliases`
 
 ### `upsert_imported_fixture`
 
@@ -497,7 +503,7 @@ List fixtures managed by the caller with roster reply totals
 | `offset` | integer; default 0; min 0 |
 | `status` | string; default null; one of `scheduled`, `washout`, `heat_out`, `forfeit`, `complete` |
 
-Returns: `id`, `org_id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_name`, `away_team_name`, `in_count`, `out_count`, `pending_count`
+Returns: `id`, `org_id`, `updated_at`, `starts_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_score`, `away_score`, `home_team_name`, `away_team_name`, `opponent_name`, `is_external_opponent`, `in_count`, `out_count`, `pending_count`
 
 ### `list_managed_fixture_roster`
 
@@ -772,7 +778,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `remove_fixture_roster_player`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -795,3 +801,99 @@ List submitted scorecard metadata for a club's fixtures; storage keys and submit
 | `offset` | integer; default 0; min 0 |
 
 Returns: `document_id`, `fixture_id`, `home_score`, `away_score`, `submitted_at`, `updated_at`, `has_document`
+
+### `create_external_club`
+
+Create an external opponent club owned by this club; the canonical name is trimmed and normalised for matching
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `canonical_name` | string; maxLength 120 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `create_external_club_placeholder`
+
+Create the internal placeholder team that stands for an external club in fixtures; at most one per external club
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `external_club_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `add_external_club_alias`
+
+Add an alias that import matching may use for an external club; aliases are unique within a club and cannot repeat another external club's canonical name there
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `external_club_id` | string |
+| `alias` | string; maxLength 120 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `set_external_club_home_venue`
+
+Set the home venue of an external club to a venue owned by this club
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `external_club_id` | string |
+| `venue_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_external_clubs`
+
+List external opponent clubs for a club with their aliases and home venue name; any active club member may read
+
+- Access: club-member; roles: none (see access); audience: member.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `org_id`, `canonical_name`, `normalized_name`, `home_venue_id`, `home_venue_name`, `aliases`, `created_at`, `updated_at`
+
+### `schedule_fixture`
+
+Schedule a fixture between an internal home team and an internal or external away team of the same club
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `org_id` | string |
+| `division_id` | string; default null |
+| `home_team_id` | string |
+| `away_team_id` | string |
+| `venue_id` | string; default null |
+| `starts_at` | string |
+| `round_label` | string; default null |
+
+Returns: `changes`: rows written; 0 means not applied.

@@ -56,7 +56,7 @@ describe('fixture roster flows with isolated local fixtures', () => {
     window.history.replaceState({}, '', '/')
     authState.user = { id: 'manager-1', login: 'local@example.test' }
     mockApp.auth.user = { id: 'manager-1', login: 'local@example.test' }
-    Object.assign(fixtureState, { in_count: 1, out_count: 0, pending_count: 1, my_availability: 'pending' })
+    Object.assign(fixtureState, { in_count: 1, out_count: 0, pending_count: 1, my_availability: 'pending', member_side: null, is_external_opponent: null, opponent_name: null, away_team_name: 'Lakeside' })
     rosterState.splice(0, rosterState.length, { user_id: 'player-1', display_name: 'Sam Player', availability: 'pending', updated_at: 1_800_000_000 })
     activityState.splice(0)
     mockApp.actions.call.mockReset()
@@ -75,6 +75,15 @@ describe('fixture roster flows with isolated local fixtures', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add to roster' }))
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('add_fixture_roster_player', { fixture_id: 'fixture-local', user_id: 'player-2' }))
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('log_fixture_roster_added', { fixture_id: 'fixture-local', user_id: 'player-2' }))
+  })
+
+  it('labels the member team and an external opponent on the player card', async () => {
+    authState.user = { id: 'player-1', login: 'player@example.test' }
+    mockApp.auth.user = { id: 'player-1', login: 'player@example.test' }
+    Object.assign(fixtureState, { member_side: 'home', is_external_opponent: 1, opponent_name: 'Rival Club', away_team_name: 'Rival Club' })
+    render(<App />)
+    expect(await screen.findByText('Your team: Northside')).toBeTruthy()
+    expect(screen.getByText('Opponent (external): Rival Club')).toBeTruthy()
   })
 
   it('records each managed roster change in the audit trail', async () => {

@@ -54,6 +54,11 @@ MANAGER_WRITES = {
     "update_fixture_match_day": {"fixture_id": "fa", "status": "washout", "match_notice": "Rain"},
     "submit_fixture_result": {"id": "sub-new", "fixture_id": "fa", "home_score": 2, "away_score": 1, "set_results": "", "scorecard_user_id": None, "scorecard_path": None, "correction_note": ""},
     "apply_fixture_result_to_fixture": {"submission_id": "sub-a", "fixture_id": "fa"},
+    "create_external_club": {"id": "ec-new", "org_id": "a", "canonical_name": "Lakeside Club"},
+    "create_external_club_placeholder": {"id": "tx-ec", "org_id": "a", "external_club_id": "ec-new"},
+    "add_external_club_alias": {"id": "al-new", "org_id": "a", "external_club_id": "ec-new", "alias": "Lakeside"},
+    "set_external_club_home_venue": {"org_id": "a", "external_club_id": "ec-new", "venue_id": "va"},
+    "schedule_fixture": {"id": "f-sched", "org_id": "a", "division_id": "da", "home_team_id": "ta", "away_team_id": "tx-ec", "venue_id": "va", "starts_at": "2026-12-01T09:00:00+11:00", "round_label": "R9"},
     "record_import_run": {"id": "imp-new", "org_id": "a", "kind": "fixtures", "received_count": 3, "saved_count": 3, "rejected_count": 0, "status": "saved"},
     "record_audit_event": {"id": "aud-new", "org_id": "a", "action": "update_venue", "target_type": "venue", "target_id": "va", "outcome": "succeeded"},
 }
@@ -239,7 +244,7 @@ class McpPermissionTests(unittest.TestCase):
             "list_club_teams", "list_club_divisions", "list_club_members", "list_managed_fixtures",
             "list_managed_fixture_roster", "list_fixture_team_candidates", "list_fixture_roster_activity",
             "list_managed_fixture_results", "list_fixture_result_history", "list_import_reports",
-            "list_audit_events", "list_authorised_documents",
+            "list_audit_events", "list_authorised_documents", "list_external_clubs",
         }
         self.assertEqual(sorted(set(TOOLS) - covered), [])
 
