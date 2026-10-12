@@ -58,6 +58,13 @@ class McpContractTests(unittest.TestCase):
             with self.subTest(action=name):
                 self.assertNotIn(";", tool["sql"])
 
+    def test_no_action_sql_contains_a_platform_rejected_keyword(self):
+        forbidden = ["create", "drop", "alter", "pragma", "attach", "detach", "vacuum", "trigger", "savepoint", "begin", "commit", "rollback"]
+        for name, tool in TOOLS.items():
+            for word in forbidden:
+                with self.subTest(action=name, keyword=word):
+                    self.assertIsNone(re.search(r"(?i)\b" + word + r"\b", tool["sql"]))
+
     def test_idempotency_matches_statement_shape(self):
         for name, tool in TOOLS.items():
             sql = tool["sql"]

@@ -59,6 +59,10 @@
     {
       "name": "0012_competition_draw_import",
       "sql": "CREATE TABLE IF NOT EXISTS import_provenance (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), entity_type TEXT NOT NULL CHECK(entity_type IN ('season','division','venue','external_club','team','fixture','external_alias')), source_system TEXT NOT NULL, source_key TEXT NOT NULL, entity_id TEXT NOT NULL, fingerprint TEXT NOT NULL, import_run_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, UNIQUE(org_id, entity_type, source_system, source_key)); CREATE INDEX IF NOT EXISTS idx_import_provenance_entity ON import_provenance(entity_id); CREATE TABLE IF NOT EXISTS draw_import_runs (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), source_system TEXT NOT NULL, source_run TEXT NOT NULL, payload_sha256 TEXT NOT NULL, importer_user_id TEXT NOT NULL, created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS draw_import_outcomes (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES draw_import_runs(id), org_id TEXT NOT NULL REFERENCES organizations(id), entity_type TEXT NOT NULL, source_key TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('create','adopt','unchanged','update','conflict','error','skipped','failed')), severity TEXT NOT NULL CHECK(severity IN ('info','blocking')), message TEXT NOT NULL, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_draw_import_outcomes_run ON draw_import_outcomes(run_id, action)"
+    },
+    {
+      "name": "0013_draw_import_records",
+      "sql": "CREATE TABLE IF NOT EXISTS draw_import_records (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES draw_import_runs(id), org_id TEXT NOT NULL REFERENCES organizations(id), entity_type TEXT NOT NULL, source_key TEXT NOT NULL, action TEXT NOT NULL CHECK(action IN ('add','adopt','unchanged','update','conflict','error','skipped','failed')), severity TEXT NOT NULL CHECK(severity IN ('info','blocking')), message TEXT NOT NULL, created_at INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS idx_draw_import_records_run ON draw_import_records(run_id, action)"
     }
   ]
 }

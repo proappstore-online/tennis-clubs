@@ -97,10 +97,10 @@ class CompetitionDrawTests(unittest.TestCase):
         plan = self.plan()
         self.assertEqual({row["severity"] for row in plan}, {"info"})
         planned = {(row["entity_type"], row["source_key"]): row["action"] for row in plan}
-        self.assertEqual(planned[("season", "2026")], "create")
-        self.assertEqual(planned[("division", "A")], "create")
-        self.assertEqual(planned[("fixture", "r1")], "create")
-        self.assertEqual(planned[("external_alias", "LC")], "create")
+        self.assertEqual(planned[("season", "2026")], "add")
+        self.assertEqual(planned[("division", "A")], "add")
+        self.assertEqual(planned[("fixture", "r1")], "add")
+        self.assertEqual(planned[("external_alias", "LC")], "add")
         self.assertEqual(self.count("seasons"), 0)
         self.assertEqual(self.count("fixtures"), 0)
         self.assertEqual(self.count("import_provenance"), 0)
@@ -224,7 +224,7 @@ class CompetitionDrawTests(unittest.TestCase):
     def test_import_run_and_report_are_recorded_with_importer_and_counts(self):
         plan = self.plan()
         self.apply_all()
-        outcomes = json.dumps([{"entity_type": r["entity_type"], "source_key": r["source_key"], "action": "create" if r["action"] == "unchanged" else r["action"], "severity": r["severity"], "message": r["message"]} for r in plan])
+        outcomes = json.dumps([{"entity_type": r["entity_type"], "source_key": r["source_key"], "action": r["action"], "severity": r["severity"], "message": r["message"]} for r in plan])
         self.call("record_draw_import_run", source_system="fixture-book", source_run="2026-spring-v1", payload_sha256=fp(json.dumps(self.payload)))
         self.call("record_draw_import_outcomes", outcomes=outcomes)
         run = dict(self.db.execute("SELECT source_system,source_run,importer_user_id FROM draw_import_runs WHERE id='run-1'").fetchone())
