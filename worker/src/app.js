@@ -105,7 +105,9 @@ async function upload(client, orgId, documentId, payload) {
   if (digest !== registered.sha256) return plain(422, 'the file hash does not match the registered document')
   const key = storageKey(orgId, documentId)
   await client.storage.put(key, bytes, { contentType }, client.workerCtx)
-  await client.call('mark_document_stored', { org_id: orgId, document_id: documentId, storage_key: key, content_type: contentType, byte_size: bytes.byteLength, sha256: digest })
+  const marked = await client.call('mark_document_stored', { org_id: orgId, document_id: documentId, storage_key: key, content_type: contentType, byte_size: bytes.byteLength, sha256: digest })
+  // A mark that changed no rows means the document was withdrawn or already stored; nothing is audited as stored.
+  if (marked?.changes === 0 || marked?.meta?.changes === 0) return plain(409, 'the document is no longer waiting for its file')
   await client.call('record_audit_event', { id: crypto.randomUUID(), org_id: orgId, action: 'mark_document_stored', target_type: 'document', target_id: documentId, outcome: 'succeeded' })
   return Response.json({ status: 'stored', sha256: digest }, { status: 201, headers: NO_STORE })
 }

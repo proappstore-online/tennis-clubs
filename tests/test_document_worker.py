@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKER = ROOT / "worker-src" / "src" / "app.js"
+WORKER = ROOT / "worker" / "src" / "app.js"
 MCP = {tool["name"]: tool for tool in json.loads((ROOT / "mcp.json").read_text())["tools"]}
 
 # Fake placeholder bytes: no real document is used or stored in this repository.
@@ -26,6 +26,7 @@ const results = [];
 for (const sc of input.scenarios) {
   const calls = [];
   const puts = [];
+  const gets = [];
   const store = new Map(Object.entries(sc.storage ?? {}).map(([k, v]) => [k, { body: Buffer.from(v, 'base64'), contentType: 'application/pdf' }]));
   const env = {
     PAS_WORKER_TOKEN: 'worker-token',
@@ -40,7 +41,7 @@ for (const sc of input.scenarios) {
         batch: async () => [],
       },
       storage: {
-        get: async (key) => store.get(key) ?? null,
+        get: async (key) => { gets.push(key); return store.get(key) ?? null },
         put: async (key, body, opts, ctx) => {
           puts.push({ key, size: body.byteLength, contentType: opts.contentType, token: ctx.token, as: ctx.as ?? null });
           store.set(key, { body: Buffer.from(body), contentType: opts.contentType });
@@ -62,6 +63,7 @@ for (const sc of input.scenarios) {
     body: bytes.toString('base64'),
     calls,
     puts,
+    gets,
   });
 }
 process.stdout.write(JSON.stringify(results));
@@ -121,6 +123,9 @@ class DocumentWorkerTests(unittest.TestCase):
              "payload": envelope_payload(method="POST", path="/documents/d1/upload", headers={"Content-Type": "application/pdf; charset=binary"}, body=PDF),
              "responses": {"check_document_upload": {"value": check_document()}}},
             {"name": "upload-get", "caller": CALLER, "payload": envelope_payload(path="/documents/d1/upload")},
+            {"name": "upload-not-marked", "caller": CALLER,
+             "payload": envelope_payload(method="POST", path="/documents/d1/upload", headers={"content-type": "application/pdf"}, body=PDF),
+             "responses": {"check_document_upload": {"value": check_document()}, "mark_document_stored": {"value": {"changes": 0}}}},
         ])
 
     def test_callers_must_be_signed_in_and_routes_are_strict(self):
@@ -138,6 +143,7 @@ class DocumentWorkerTests(unittest.TestCase):
         self.assertNotIn("outcome", denied["calls"][1]["params"])
         self.assertTrue(all(c["as"] == CALLER for c in denied["calls"]))
         self.assertEqual(denied["puts"], [])
+        self.assertEqual(denied["gets"], [], "a denied download must not read storage")
 
     def test_a_stored_file_is_served_only_after_authorisation_and_integrity_checks(self):
         ok = self.results["download"]
@@ -148,6 +154,7 @@ class DocumentWorkerTests(unittest.TestCase):
         self.assertEqual(ok["cache"], "private, no-store")
         self.assertEqual([c["name"] for c in ok["calls"]], ["check_document_access", "log_document_access"])
         self.assertNotIn("outcome", ok["calls"][1]["params"])
+        self.assertEqual(ok["gets"], ["docs/a/d1"])
         self.assertEqual(self.results["missing-file"]["status"], 503)
         self.assertEqual(self.results["tampered-file"]["status"], 500)
         self.assertNotIn(b"docs/a", base64.b64decode(ok["body"]))
@@ -173,6 +180,11 @@ class DocumentWorkerTests(unittest.TestCase):
         self.assertEqual((mark["storage_key"], mark["sha256"], mark["byte_size"]), ("docs/a/d1", SHA, len(PDF)))
         self.assertTrue(all(c["as"] == CALLER for c in ok["calls"]))
 
+    def test_an_upload_that_changes_no_document_is_refused_and_not_audited(self):
+        refused = self.results["upload-not-marked"]
+        self.assertEqual(refused["status"], 409)
+        self.assertEqual([c["name"] for c in refused["calls"]], ["check_document_upload", "mark_document_stored"])
+
     def test_every_action_the_worker_calls_exists_with_matching_parameters(self):
         source = WORKER.read_text()
         for name, body in re.findall(r"client\.call\('([a-z_]+)',\s*\{([^}]*)\}", source):
@@ -187,6 +199,22 @@ class DocumentWorkerTests(unittest.TestCase):
         for name, result in self.results.items():
             with self.subTest(scenario=name):
                 self.assertNotIn(b"docs/", base64.b64decode(result["body"]))
+
+
+class WorkerDeployContractTests(unittest.TestCase):
+    """The deploy workflow only uploads a worker it can build from worker/; these guard that contract."""
+
+    def test_the_deploy_builds_worker_and_uploads_its_entry_module(self):
+        workflow = (ROOT / ".github" / "workflows" / "deploy.yml").read_text()
+        self.assertIn("hashFiles('worker/package.json')", workflow)
+        self.assertIn("pnpm --dir worker build", workflow)
+        self.assertIn("worker/dist/app.js", workflow)
+        self.assertTrue((ROOT / "worker" / "package.json").exists())
+        self.assertIn("dist/app.js", (ROOT / "worker" / "build.mjs").read_text())
+
+    def test_the_built_entry_module_is_the_tested_source(self):
+        self.assertIn("export default", WORKER.read_text())
+        self.assertNotIn("worker-src", (ROOT / "docs" / "mcp-contract.md").read_text())
 
 
 if __name__ == "__main__":

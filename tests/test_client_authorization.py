@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT_SOURCES = [*ROOT.joinpath("web", "src").rglob("*.ts"), *ROOT.joinpath("web", "src").rglob("*.tsx"),
-                  *ROOT.joinpath("worker-src", "src").rglob("*.js")]
+                  *ROOT.joinpath("worker", "src").rglob("*.js")]
 # PAS app-role APIs: the SDK's roles module and any role-name check built on it. Club access must come from the server.
 PAS_ROLE_CALL = re.compile(r"\bapp\.roles\b|\.roles\.(check|has|assign|revoke|list)\(|\bhasRole\(|\buseRoles\b")
 
