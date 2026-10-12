@@ -1557,6 +1557,18 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "enum": [
           "add_external_club_alias",
           "add_fixture_roster_player",
+          "apply_draw_divisions",
+          "apply_draw_external_aliases",
+          "apply_draw_external_clubs",
+          "apply_draw_fixture_updates",
+          "apply_draw_fixtures",
+          "apply_draw_placeholders",
+          "apply_draw_provenance",
+          "apply_draw_roster",
+          "apply_draw_seasons",
+          "apply_draw_teams",
+          "apply_draw_venue_updates",
+          "apply_draw_venues",
           "apply_fixture_result_to_fixture",
           "bootstrap_club_admin",
           "create_division",
@@ -2284,6 +2296,410 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "source_row",
         "type": "integer",
         "min": 1
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_seasons",
+    "description": "Step 1 of a competition-draw import: create the draw's season when it is new (never changes an existing season)",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_divisions",
+    "description": "Step 2 of a competition-draw import: create new divisions under the draw's season",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_venues",
+    "description": "Step 3 of a competition-draw import: create new venues; convenor phone numbers are never accepted",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_external_clubs",
+    "description": "Step 4 of a competition-draw import: create new external opponent clubs owned by this club",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_external_aliases",
+    "description": "Step 5 of a competition-draw import: add new aliases for external clubs; an alias owned by another club is never written",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_placeholders",
+    "description": "Step 6 of a competition-draw import: create the internal placeholder team for each external club (at most one per club)",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_teams",
+    "description": "Step 7 of a competition-draw import: create new internal teams in their draw division (external opponents are never created as teams here)",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_fixtures",
+    "description": "Step 8 of a competition-draw import: create new fixtures between draw teams or external opponents; a fixture with no confirmed start time is stored as tbc",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_roster",
+    "description": "Step 9 of a competition-draw import: add roster players by name to a draw fixture (no contact details; existing players are kept)",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_venue_updates",
+    "description": "Update venue address, map link and notes for venues whose draw fingerprint changed; venue names are never changed here",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_fixture_updates",
+    "description": "Update the time, time status and venue of draw fixtures whose fingerprint changed; a time status is never downgraded and a confirmed time only changes through a confirmed source",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "apply_draw_provenance",
+    "description": "Final step of a competition-draw import: record the source key and fingerprint for every created, adopted or updated record",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "record_draw_import_run",
+    "description": "Record the importer, time, source system, source run and payload hash of a competition-draw import run",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      },
+      {
+        "name": "source_system",
+        "type": "string"
+      },
+      {
+        "name": "source_run",
+        "type": "string"
+      },
+      {
+        "name": "payload_sha256",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "record_draw_import_outcomes",
+    "description": "Record the per-record outcome of a competition-draw import run (create, adopt, unchanged, update, conflict, error, skipped or failed) from a JSON array",
+    "operation": "execute",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      },
+      {
+        "name": "outcomes",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "import_competition_draw",
+    "description": "Dry run of a competition-draw import: validates the structured draw payload and reports, per record, whether it would be created, adopted, unchanged, updated, conflicted or rejected; writes nothing. Admins only.",
+    "operation": "query",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "payload",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "get_draw_import_report",
+    "description": "Structured report of one competition-draw import run: record counts by outcome (create, adopt, unchanged, update, conflict, error, skipped, failed)",
+    "operation": "query",
+    "roles": [
+      "admin"
+    ],
+    "access": "club-admin",
+    "audience": "admin",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
       }
     ]
   }

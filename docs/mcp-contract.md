@@ -54,6 +54,16 @@ Every audited write has a matching `record_audit_event` action name. The write's
 
 Limitation: the write and its audit record are separate statements. A client that does not call `record_audit_event` leaves no record. Completeness therefore depends on the client. Server-atomic auditing needs a multi-statement action, which this manifest does not yet use.
 
+## Competition draw import
+
+Admins of a club import one competition draw with `import_competition_draw` (dry run) and the `apply_draw_*` actions. The payload is a JSON object with `source_system`, `source_run`, a `season`, `divisions`, `venues`, `external_clubs` (with `aliases`), `teams`, `fixtures` (each with `round`, `home`, `away`, `away_kind` `team` or `external`, `venue`, `starts_at`, `time_status`) and `rosters` (player names only). Every keyed record needs a stable `key` and a 64-character hex `fingerprint` computed from its source values. A payload with contact fields, unknown references, duplicate keys or invalid dates or times is rejected whole, and no apply action writes anything.
+
+Run the steps in this order: `apply_draw_seasons`, `apply_draw_divisions`, `apply_draw_venues`, `apply_draw_external_clubs`, `apply_draw_external_aliases`, `apply_draw_placeholders`, `apply_draw_teams`, `apply_draw_fixtures`, `apply_draw_roster`, `apply_draw_venue_updates`, `apply_draw_fixture_updates`, `apply_draw_provenance`. Each step writes only the records the dry run classifies as creatable or updatable, so a rerun changes nothing that is already imported and resumes a partial import. Record the run with `record_draw_import_run`, then the plan rows with `record_draw_import_outcomes`, and read the counts with `get_draw_import_report`.
+
+Outcomes are `create`, `adopt` (matched an existing record by name and linked it), `unchanged`, `update`, `conflict` (ambiguous names, an alias owned by another club, or a changed fingerprint on a record that is not updated automatically) and `error`. A conflict skips only that record and its dependants; it is reported, not written.
+
+Atomicity: the platform runs one SQL statement per action, so the steps are not a single transaction. Each step is all-or-nothing on its own, and the run is resumable because every step is idempotent. A caller that stops between steps leaves a partial import that the next run completes. Provenance records (`import_provenance`) hold the source system, key, fingerprint and the importer's run id. Contact details are never accepted or stored by this import.
+
 ## Redaction
 
 Fields withheld from an audience are listed per action. Player-facing reads never select convenor phone numbers, roster contact details, scorecard storage keys, or submitter identities. Document metadata is limited to presence, scores and timestamps; storage keys are never returned by `list_authorised_documents`.
@@ -126,6 +136,22 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `validate_fixture_import` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
 | `reconcile_imported_fixture_time` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `record_fixture_import_resolution` | execute | `admin`, `convenor`, `manager` | manager | idempotent | no | no | no |
+| `apply_draw_seasons` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_divisions` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_venues` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_external_clubs` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_external_aliases` | execute | `admin` | admin | idempotent | yes | no | no |
+| `apply_draw_placeholders` | execute | `admin` | admin | idempotent | yes | no | no |
+| `apply_draw_teams` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_fixtures` | execute | `admin` | admin | not-idempotent | yes | no | no |
+| `apply_draw_roster` | execute | `admin` | admin | idempotent | yes | no | no |
+| `apply_draw_venue_updates` | execute | `admin` | admin | idempotent | yes | no | no |
+| `apply_draw_fixture_updates` | execute | `admin` | admin | idempotent | yes | no | no |
+| `apply_draw_provenance` | execute | `admin` | admin | idempotent | yes | no | no |
+| `record_draw_import_run` | execute | `admin` | admin | idempotent | no | no | no |
+| `record_draw_import_outcomes` | execute | `admin` | admin | idempotent | no | no | no |
+| `import_competition_draw` | query | `admin` | admin | read-only | no | no | no |
+| `get_draw_import_report` | query | `admin` | admin | read-only | no | no | no |
 
 ### `list_my_fixtures`
 
@@ -800,7 +826,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `bootstrap_club_admin`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `reconcile_imported_fixture_time`, `remove_fixture_roster_player`, `schedule_fixture`, `set_external_club_home_venue`, `set_team_player_pool`, `submit_fixture_result`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1089,3 +1115,232 @@ Record that a manager accepted a warning for one source row of an import run; bl
 | `source_row` | integer; min 1 |
 
 Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_seasons`
+
+Step 1 of a competition-draw import: create the draw's season when it is new (never changes an existing season)
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_divisions`
+
+Step 2 of a competition-draw import: create new divisions under the draw's season
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_venues`
+
+Step 3 of a competition-draw import: create new venues; convenor phone numbers are never accepted
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_external_clubs`
+
+Step 4 of a competition-draw import: create new external opponent clubs owned by this club
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_external_aliases`
+
+Step 5 of a competition-draw import: add new aliases for external clubs; an alias owned by another club is never written
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_placeholders`
+
+Step 6 of a competition-draw import: create the internal placeholder team for each external club (at most one per club)
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_teams`
+
+Step 7 of a competition-draw import: create new internal teams in their draw division (external opponents are never created as teams here)
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_fixtures`
+
+Step 8 of a competition-draw import: create new fixtures between draw teams or external opponents; a fixture with no confirmed start time is stored as tbc
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_roster`
+
+Step 9 of a competition-draw import: add roster players by name to a draw fixture (no contact details; existing players are kept)
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_venue_updates`
+
+Update venue address, map link and notes for venues whose draw fingerprint changed; venue names are never changed here
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_fixture_updates`
+
+Update the time, time status and venue of draw fixtures whose fingerprint changed; a time status is never downgraded and a confirmed time only changes through a confirmed source
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `apply_draw_provenance`
+
+Final step of a competition-draw import: record the source key and fingerprint for every created, adopted or updated record
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+| `import_run_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `record_draw_import_run`
+
+Record the importer, time, source system, source run and payload hash of a competition-draw import run
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `import_run_id` | string |
+| `source_system` | string; maxLength 60 |
+| `source_run` | string; maxLength 120 |
+| `payload_sha256` | string; maxLength 64 |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `record_draw_import_outcomes`
+
+Record the per-record outcome of a competition-draw import run (create, adopt, unchanged, update, conflict, error, skipped or failed) from a JSON array
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: idempotent. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `import_run_id` | string |
+| `outcomes` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `import_competition_draw`
+
+Dry run of a competition-draw import: validates the structured draw payload and reports, per record, whether it would be created, adopted, unchanged, updated, conflicted or rejected; writes nothing. Admins only.
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `payload` | string |
+
+Returns: `entity_type`, `source_key`, `action`, `severity`, `message`
+
+### `get_draw_import_report`
+
+Structured report of one competition-draw import run: record counts by outcome (create, adopt, unchanged, update, conflict, error, skipped, failed)
+
+- Access: club-admin; roles: admin; audience: admin.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `import_run_id` | string |
+
+Returns: `action`, `severity`, `records`

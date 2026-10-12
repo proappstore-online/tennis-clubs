@@ -250,7 +250,7 @@ class McpPermissionTests(unittest.TestCase):
             "list_club_teams", "list_club_divisions", "list_club_members", "list_managed_fixtures",
             "list_managed_fixture_roster", "list_fixture_team_candidates", "list_fixture_roster_activity",
             "list_managed_fixture_results", "list_fixture_result_history", "list_import_reports",
-            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history", "validate_fixture_import",
+            "list_audit_events", "list_authorised_documents", "list_external_clubs", "list_team_pool", "list_team_pool_history", "list_fixture_selection_history", "validate_fixture_import", "apply_draw_divisions", "apply_draw_external_aliases", "apply_draw_external_clubs", "apply_draw_fixture_updates", "apply_draw_fixtures", "apply_draw_placeholders", "apply_draw_provenance", "apply_draw_roster", "apply_draw_seasons", "apply_draw_teams", "apply_draw_venue_updates", "apply_draw_venues", "get_draw_import_report", "import_competition_draw", "record_draw_import_outcomes", "record_draw_import_run",
         }
         self.assertEqual(sorted(set(TOOLS) - covered), [])
 

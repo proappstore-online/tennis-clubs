@@ -14,7 +14,7 @@ renderer = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(renderer)
 
 IDEMPOTENCY = {"read-only", "idempotent", "not-idempotent", "append-only"}
-AUDIENCES = {"manager", "player", "member", "invitee", "creator", "self"}
+AUDIENCES = {"manager", "admin", "player", "member", "invitee", "creator", "self"}
 PRIVATE_FIELDS = {"convenor_phone", "contact", "scorecard_path", "scorecard_user_id", "submitted_by", "invite_token", "actor_user_id", "email"}
 PLAYER_AUDIENCES = {"player", "invitee", "self"}
 SELF_RECORDED_AUDIENCES = {"creator", "invitee", "self"}
@@ -48,7 +48,7 @@ class McpContractTests(unittest.TestCase):
 
     def test_convenor_is_a_manager_role_in_every_club_gate(self):
         for name, tool in TOOLS.items():
-            if tool["contract"]["roles"]:
+            if tool["contract"]["roles"] and tool["contract"]["roles"] != ["admin"]:
                 with self.subTest(action=name):
                     self.assertIn("convenor", tool["contract"]["roles"])
                     self.assertIn("manager", tool["contract"]["roles"])
@@ -58,15 +58,16 @@ class McpContractTests(unittest.TestCase):
             sql = tool["sql"]
             mode = tool["contract"]["idempotency"]
             with self.subTest(action=name, idempotency=mode):
+                main = re.search(r"\b(INSERT INTO|UPDATE|DELETE FROM)\b", sql)
                 if mode == "read-only":
                     self.assertEqual(tool["operation"], "query")
                 elif mode == "idempotent":
                     self.assertEqual(tool["operation"], "execute")
-                    self.assertTrue(re.search(r"ON CONFLICT|^UPDATE|^DELETE", sql.strip()), sql[:80])
+                    self.assertTrue(main and ("ON CONFLICT" in sql[main.start():] or main.group(1) in ("UPDATE", "DELETE FROM")), sql[:80])
                 else:
                     self.assertEqual(tool["operation"], "execute")
-                    self.assertTrue(sql.strip().startswith("INSERT"), sql[:80])
-                    self.assertNotIn("ON CONFLICT", sql)
+                    self.assertTrue(main and main.group(1) == "INSERT INTO", sql[:80])
+                    self.assertNotIn("ON CONFLICT", sql[main.start():])
 
     def test_list_actions_page_with_bounded_limit_offset_and_stable_order(self):
         for name, tool in TOOLS.items():

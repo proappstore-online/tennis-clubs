@@ -63,6 +63,8 @@ class RoleMatrixTests(unittest.TestCase):
     def test_every_club_role_gate_treats_convenor_as_manager(self):
         for name, tool in TOOLS.items():
             sql = tool.get("sql", "")
+            if tool["contract"]["roles"] == ["admin"]:
+                continue
             if "cm.role IN (" in sql or "role IN (" in sql:
                 with self.subTest(action=name):
                     self.assertIn("'convenor'", sql)
