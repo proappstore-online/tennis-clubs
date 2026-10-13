@@ -168,9 +168,9 @@
     },
     {
       "name": "upsert_imported_fixture",
-      "description": "Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time",
+      "description": "Create or update an imported fixture; a row is stored only when every warning code it declares in warning_codes (a JSON array) has its own acceptance for this run and source row. A row with no confirmed start time is stored as TBC and never as a confirmed time",
       "operation": "execute",
-      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at, time_status, arrival_at, source_row, source_date_raw, source_time_raw, source_import_run_id,review_status) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now, :time_status, :arrival_at, :source_row, :source_date_raw, :source_time_raw, :import_run_id, CASE :time_status WHEN 'confirmed' THEN 'auto_approved' ELSE 'needs_review' END WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND t.is_external = 0 AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND (v.org_id=:org_id OR v.shared=1)) AND julianday(:starts_at) IS NOT NULL AND :time_status IN ('confirmed','estimated','tbc') AND (:warning_count = 0 OR EXISTS (SELECT 1 FROM import_issue_resolutions r WHERE r.org_id = :org_id AND r.import_run_id = :import_run_id)) AND NOT EXISTS (SELECT 1 FROM fixtures x WHERE x.org_id = :org_id AND x.round_label = :round_label AND x.home_team_id = :home_team_id AND x.away_team_id = :away_team_id AND x.starts_at <> :starts_at AND substr(x.starts_at,1,10) = substr(:starts_at,1,10)) ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now, time_status = excluded.time_status, arrival_at = COALESCE(excluded.arrival_at, fixtures.arrival_at), source_row = COALESCE(excluded.source_row, fixtures.source_row), source_date_raw = COALESCE(excluded.source_date_raw, fixtures.source_date_raw), source_time_raw = COALESCE(excluded.source_time_raw, fixtures.source_time_raw), source_import_run_id = COALESCE(excluded.source_import_run_id, fixtures.source_import_run_id), review_status = CASE WHEN excluded.time_status = 'confirmed' THEN 'auto_approved' ELSE fixtures.review_status END, reviewed_by = CASE WHEN excluded.time_status = 'confirmed' THEN NULL ELSE fixtures.reviewed_by END, reviewed_at = CASE WHEN excluded.time_status = 'confirmed' THEN NULL ELSE fixtures.reviewed_at END WHERE (CASE excluded.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) >= (CASE fixtures.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END)",
+      "sql": "INSERT INTO fixtures (id, org_id, division_id, home_team_id, away_team_id, venue_id, starts_at, round_label, status, created_at, time_status, arrival_at, source_row, source_date_raw, source_time_raw, source_import_run_id,review_status) SELECT :id, :org_id, (SELECT t.division_id FROM teams t WHERE t.id = :home_team_id AND t.org_id = :org_id), :home_team_id, :away_team_id, :venue_id, :starts_at, :round_label, 'scheduled', :__now, :time_status, :arrival_at, :source_row, :source_date_raw, :source_time_raw, :import_run_id, CASE :time_status WHEN 'confirmed' THEN 'auto_approved' ELSE 'needs_review' END WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM teams t JOIN divisions d ON d.id = t.division_id JOIN seasons s ON s.id = d.season_id WHERE t.id = :home_team_id AND t.org_id = :org_id AND t.is_external = 0 AND s.name = :season) AND EXISTS (SELECT 1 FROM teams t WHERE t.id = :away_team_id AND t.org_id = :org_id) AND EXISTS (SELECT 1 FROM venues v WHERE v.id = :venue_id AND (v.org_id=:org_id OR v.shared=1)) AND julianday(:starts_at) IS NOT NULL AND :time_status IN ('confirmed','estimated','tbc') AND json_type(:warning_codes)='array' AND NOT EXISTS (SELECT 1 FROM json_each(:warning_codes) w WHERE NOT EXISTS (SELECT 1 FROM import_issue_resolutions r WHERE r.org_id = :org_id AND r.import_run_id = :import_run_id AND r.source_row = :source_row AND r.code = w.value)) AND NOT EXISTS (SELECT 1 FROM fixtures x WHERE x.org_id = :org_id AND x.round_label = :round_label AND x.home_team_id = :home_team_id AND x.away_team_id = :away_team_id AND x.starts_at <> :starts_at AND substr(x.starts_at,1,10) = substr(:starts_at,1,10)) ON CONFLICT(org_id, round_label, starts_at, home_team_id, away_team_id) DO UPDATE SET venue_id = excluded.venue_id, division_id = excluded.division_id, updated_at = :__now, time_status = excluded.time_status, arrival_at = COALESCE(excluded.arrival_at, fixtures.arrival_at), source_row = COALESCE(excluded.source_row, fixtures.source_row), source_date_raw = COALESCE(excluded.source_date_raw, fixtures.source_date_raw), source_time_raw = COALESCE(excluded.source_time_raw, fixtures.source_time_raw), source_import_run_id = COALESCE(excluded.source_import_run_id, fixtures.source_import_run_id), review_status = CASE WHEN excluded.time_status = 'confirmed' THEN 'auto_approved' ELSE fixtures.review_status END, reviewed_by = CASE WHEN excluded.time_status = 'confirmed' THEN NULL ELSE fixtures.reviewed_by END, reviewed_at = CASE WHEN excluded.time_status = 'confirmed' THEN NULL ELSE fixtures.reviewed_at END WHERE (CASE excluded.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END) >= (CASE fixtures.time_status WHEN 'confirmed' THEN 3 WHEN 'estimated' THEN 2 ELSE 1 END)",
       "params": {
         "id": {
           "type": "string"
@@ -226,10 +226,8 @@
           "type": "string",
           "default": null
         },
-        "warning_count": {
-          "type": "integer",
-          "default": 0,
-          "min": 0
+        "warning_codes": {
+          "type": "string"
         }
       },
       "requires_auth": true,
@@ -1606,7 +1604,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'register_document', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'record_import_run_issues', 'register_document', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1648,6 +1646,7 @@
             "reconcile_imported_fixture_time",
             "record_draw_import_outcomes",
             "record_draw_import_run",
+            "record_import_run_issues",
             "register_document",
             "remove_fixture_roster_player",
             "schedule_fixture",
@@ -2421,6 +2420,78 @@
         "audit": false,
         "paging": false,
         "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "record_import_run_issues",
+      "description": "Store the row-level issues (blocking and warning) that a fixture import check reported, on its import run. Each issue is stored once per run, source row and code; replaying the same list adds nothing. Only managers of the run's club can record them",
+      "operation": "execute",
+      "sql": "INSERT INTO import_run_issues (id,org_id,import_run_id,source_row,severity,code,field,message,remediation,created_at) SELECT :import_run_id||':'||json_extract(j.value,'$.source_row')||':'||json_extract(j.value,'$.code'),:org_id,:import_run_id,json_extract(j.value,'$.source_row'),json_extract(j.value,'$.severity'),json_extract(j.value,'$.code'),substr(json_extract(j.value,'$.field'),1,80),substr(json_extract(j.value,'$.message'),1,300),substr(json_extract(j.value,'$.remediation'),1,300),:__now FROM json_each(:issues) j WHERE json_type(:issues)='array' AND json_extract(j.value,'$.source_row') >= 1 AND json_extract(j.value,'$.severity') IN ('blocking','warning') AND json_extract(j.value,'$.code') IS NOT NULL AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) AND EXISTS (SELECT 1 FROM import_runs r WHERE r.id=:import_run_id AND r.org_id=:org_id) ON CONFLICT DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "import_run_id": {
+          "type": "string"
+        },
+        "issues": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_import_run_issues",
+      "description": "List the row-level issues stored for one fixture import run, in source line order. Only managers of the run's club can read them",
+      "operation": "query",
+      "sql": "SELECT i.source_row,i.severity,i.code,i.field,i.message,i.remediation,i.created_at AS updated_at FROM import_run_issues i WHERE i.org_id=:org_id AND i.import_run_id=:import_run_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=i.org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ORDER BY i.source_row, i.code, i.severity LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "import_run_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": true,
         "redacts": []
       }
     },

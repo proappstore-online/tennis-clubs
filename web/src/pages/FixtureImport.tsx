@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { recordAudit } from './auditTrail'
-import { mapFixtureRows, normalizeDate, parseCsv, type FixtureOption, type FixtureRow } from './fixtureImportLogic'
+import { issueRecords, mapFixtureRows, normalizeDate, parseCsv, upsertFixtureArgs, type FixtureOption, type FixtureRow, type ValidationIssue } from './fixtureImportLogic'
 
 type Option = FixtureOption
 type RosterRow = { player_name: string; contact: string; team: string; fixture_round: string; fixture_opponent: string; fixture_date: string; issue?: string }
-type Issue = { source_row: number; severity: 'blocking' | 'warning'; code: string; field: string; message: string; remediation: string }
+type Issue = ValidationIssue
 type RawRow = Record<string, string>
 
 const issueKey = (issue: Issue) => `${issue.code}:${issue.source_row}`
@@ -93,6 +93,15 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
     return recordAudit(app, { orgId, action: kind === 'fixtures' ? 'upsert_imported_fixture' : 'upsert_imported_roster_player', targetType: 'import_run', targetId: id, outcome: status === 'saved' ? 'succeeded' : 'refused' })
   }
 
+  // Stores every issue the check reported on the run, so the import report can show each row's problems. Needs the run row, so it runs after the run is recorded.
+  async function recordIssues(orgId: string | undefined, id: string): Promise<boolean> {
+    if (!orgId || !issues || fixtures.length === 0) return true
+    try {
+      await app.actions.call('record_import_run_issues', { org_id: orgId, import_run_id: id, issues: JSON.stringify(issueRecords(issues)) })
+      return true
+    } catch { return false }
+  }
+
   async function save() {
     setBusy(true); setMessage('')
     const orgIds = [...new Set(fixtures.map((row) => row.org_id).filter((value): value is string => Boolean(value)))]
@@ -104,7 +113,7 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
       for (const row of fixtures) {
         if (row.issue) throw new Error('Fix all fixture validation errors before saving.')
         await app.actions.call('reconcile_imported_fixture_time', { org_id: row.org_id, round_label: row.round.trim(), home_team_id: row.home_team_id, away_team_id: row.away_team_id, starts_at: row.starts_at, time_status: row.timing_status, arrival_at: row.arrival_at, source_row: row.source_row, source_date_raw: row.source_date_raw, source_time_raw: row.start_time ?? '', import_run_id: runId })
-        await app.actions.call('upsert_imported_fixture', { id: crypto.randomUUID(), org_id: row.org_id, home_team_id: row.home_team_id, away_team_id: row.away_team_id, venue_id: row.venue_id, starts_at: row.starts_at, round_label: row.round.trim(), season: row.season.trim(), time_status: row.timing_status, arrival_at: row.arrival_at, source_row: row.source_row, source_date_raw: row.source_date_raw, source_time_raw: row.start_time ?? '', import_run_id: runId, warning_count: warnings.length })
+        await app.actions.call('upsert_imported_fixture', upsertFixtureArgs(row, runId, issues ?? [], crypto.randomUUID()))
       }
       for (const row of roster) {
         if (row.issue) throw new Error('Fix all roster validation errors before saving.')
@@ -112,10 +121,11 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
         if (!fixture?.org_id) throw new Error('A roster entry refers to an unimported fixture.')
         await app.actions.call('upsert_imported_roster_player', { id: crypto.randomUUID(), org_id: fixture.org_id, starts_at: fixture.starts_at, round_label: fixture.round.trim(), team: fixture.team.trim(), opponent: fixture.opponent.trim(), player_name: row.player_name.trim() })
       }
-      const recorded = [await recordImport(orgId, 'fixtures', fixtures.length, fixtures.length, 'saved', runId, counts), await recordImport(orgId, 'roster', roster.length, roster.length, 'saved', crypto.randomUUID(), counts)]
+      const recorded = [await recordImport(orgId, 'fixtures', fixtures.length, fixtures.length, 'saved', runId, counts), await recordImport(orgId, 'roster', roster.length, roster.length, 'saved', crypto.randomUUID(), counts), await recordIssues(orgId, runId)]
       setMessage(`Saved ${fixtures.length} fixture rows and ${roster.length} roster rows.${recorded.every(Boolean) ? '' : ' The import report could not be written.'}`)
     } catch (error) {
       await recordImport(orgId, 'fixtures', fixtures.length, 0, 'rejected', runId, counts)
+      await recordIssues(orgId, runId)
       setMessage(error instanceof Error ? error.message : 'Import failed. Please check your files and try again.')
     }
     finally { setBusy(false) }

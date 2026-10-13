@@ -83,6 +83,10 @@
     {
       "name": "0018_draw_outcome_warnings",
       "sql": "ALTER TABLE draw_import_records ADD COLUMN outcome TEXT CHECK(outcome IS NULL OR outcome IN ('created','updated','skipped','conflicted','failed')); ALTER TABLE draw_import_records ADD COLUMN warning INTEGER NOT NULL DEFAULT 0 CHECK(warning IN (0,1))"
+    },
+    {
+      "name": "0019_import_run_issues",
+      "sql": "CREATE TABLE IF NOT EXISTS import_run_issues (id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id), import_run_id TEXT NOT NULL REFERENCES import_runs(id), source_row INTEGER NOT NULL CHECK(source_row >= 1), severity TEXT NOT NULL CHECK(severity IN ('blocking','warning')), code TEXT NOT NULL, field TEXT, message TEXT, remediation TEXT, created_at INTEGER NOT NULL, UNIQUE(import_run_id, source_row, code)); CREATE INDEX IF NOT EXISTS idx_import_run_issues_run ON import_run_issues(import_run_id, source_row, code)"
     }
   ]
 }

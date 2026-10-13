@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { fixtureStartLabel } from '../fixtureTime'
 import { outcomeOf, recordAudit } from './auditTrail'
-import { approvalLabel, awaitingReview, fingerprint, latestRun, managerClubs, provenanceRows, reportDate, type Club, type ImportRun, type ManagedFixture } from './importReviewLogic'
+import { approvalLabel, awaitingReview, fingerprint, issueSeverityLabel, latestRun, managerClubs, provenanceRows, reportDate, type Club, type ImportRun, type ManagedFixture, type RunIssue } from './importReviewLogic'
 
 const kindLabel = (kind: ImportRun['kind']) => (kind === 'fixtures' ? 'Fixture book' : 'Team roster')
 const timeStatusLabel = (status: string | null) => ({ confirmed: 'Confirmed time', estimated: 'Estimated time', tbc: 'Start time TBC' } as Record<string, string>)[status ?? ''] ?? 'Time not recorded'
@@ -19,6 +19,8 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
   const [fixturesReady, setFixturesReady] = useState(false)
   const [reviewingId, setReviewingId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [issues, setIssues] = useState<RunIssue[]>([])
+  const [issuesError, setIssuesError] = useState('')
   const [error, setError] = useState('')
 
   const loadFixtures = useCallback(async () => {
@@ -75,6 +77,18 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
     } finally { setReviewingId('') }
   }
 
+  const fixtureRunId = latestRun(runs, 'fixtures')?.id ?? ''
+
+  // The row issues the import check stored on this fixture book's run.
+  useEffect(() => {
+    if (!clubId || !fixtureRunId) { setIssues([]); return }
+    let active = true
+    app.actions.call<{ rows: RunIssue[] }>('list_import_run_issues', { org_id: clubId, import_run_id: fixtureRunId, limit: 100 })
+      .then((result) => { if (active) { setIssues(result.rows ?? []); setIssuesError('') } })
+      .catch(() => { if (active) setIssuesError('Row issues could not be loaded for this import.') })
+    return () => { active = false }
+  }, [app, clubId, fixtureRunId])
+
   const fixtureRun = latestRun(runs, 'fixtures')
   const rosterRun = latestRun(runs, 'roster')
   const provenance = fixtureRun ? provenanceRows(fixtures, clubId, fixtureRun.id) : []
@@ -114,6 +128,16 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
 
       <section className="mt-8">
         <h2 className="text-xl font-bold text-[var(--ink)]">Review imported fixtures</h2>
+        {idle && fixtureRun && issuesError && <p role="alert" className="mt-3 rounded-xl bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">{issuesError}</p>}
+        {idle && fixtureRun && !issuesError && <section className="mt-4">
+          <h3 className="text-lg font-bold text-[var(--ink)]">Row issues from this import</h3>
+          {issues.length === 0 && <p className="mt-2 text-sm text-[var(--muted)]">No row issues were recorded for this import.</p>}
+          {issues.length > 0 && <ul className="mt-2 grid gap-2">{issues.map((issue) => <li key={`${issue.source_row}:${issue.code}`} className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 text-sm">
+            <span className="font-semibold text-[var(--ink)]">Source line {issue.source_row} · {issueSeverityLabel(issue.severity)} · {issue.code}</span>
+            <span className="block text-[var(--ink)]">{issue.message}</span>
+            {issue.remediation && <span className="block text-xs text-[var(--muted)]">{issue.remediation}</span>}
+          </li>)}</ul>}
+        </section>}
         {fixturesLoading && <p className="mt-2 text-sm text-[var(--muted)]" role="status">Loading fixtures…</p>}
         {idle && !fixtureRun && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">No fixtures have been imported for this club yet.</p>}
         {idle && fixtureRun && provenance.length === 0 && <p className="mt-2 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">The latest import has no fixtures you can manage.</p>}

@@ -151,6 +151,31 @@ describe('import review', () => {
   })
 })
 
+describe('import review row issues', () => {
+  it('lists the row issues stored for the latest fixture book, with their source line and text', async () => {
+    render(<ImportReview app={appWith({
+      list_my_clubs: { rows: [manager] },
+      list_import_reports: { rows: [run({})] },
+      list_managed_fixtures: { rows: [] },
+      list_import_run_issues: { rows: [{ source_row: 3, severity: 'warning', code: 'estimated_time', field: 'time_status', message: 'Estimated time', remediation: 'Accept or confirm' }] },
+    })} />)
+    expect(await screen.findByText('Source line 3 · Warning · estimated_time')).toBeTruthy()
+    expect(screen.getByText('Estimated time')).toBeTruthy()
+    expect(screen.getByText('Accept or confirm')).toBeTruthy()
+  })
+
+  it('says so when the import recorded no row issues', async () => {
+    render(<ImportReview app={appWith({ list_my_clubs: { rows: [manager] }, list_import_reports: { rows: [run({})] }, list_managed_fixtures: { rows: [] }, list_import_run_issues: { rows: [] } })} />)
+    expect(await screen.findByText('No row issues were recorded for this import.')).toBeTruthy()
+  })
+
+  it('reports a failed issue load instead of an empty list', async () => {
+    render(<ImportReview app={appWith({ list_my_clubs: { rows: [manager] }, list_import_reports: { rows: [run({})] }, list_managed_fixtures: { rows: [] }, list_import_run_issues: new Error('boom') })} />)
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Row issues could not be loaded for this import.')
+    expect(screen.queryByText('No row issues were recorded for this import.')).toBeNull()
+  })
+})
+
 describe('import review logic', () => {
   it('keeps only manager roles and picks the newest run of each kind', () => {
     expect(managerClubs([{ id: 'a', name: 'A', role: 'admin' }, { id: 'b', name: 'B', role: 'player' }, { id: 'c', name: 'C', role: 'convenor' }]).map((club) => club.id)).toEqual(['a', 'c'])

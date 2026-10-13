@@ -146,6 +146,8 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `reconcile_imported_fixture_time` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `approve_fixture_review` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
 | `record_fixture_import_resolution` | execute | `admin`, `convenor`, `manager` | manager | idempotent | no | no | no |
+| `record_import_run_issues` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `list_import_run_issues` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | yes |
 | `apply_draw_seasons` | execute | `admin` | admin | not-idempotent | yes | no | no |
 | `apply_draw_divisions` | execute | `admin` | admin | not-idempotent | yes | no | no |
 | `apply_draw_venues` | execute | `admin` | admin | not-idempotent | yes | no | no |
@@ -257,7 +259,7 @@ Returns: `kind`, `id`, `name`, `org_id`, `division_id`, `season_name`, `aliases`
 
 ### `upsert_imported_fixture`
 
-Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time
+Create or update an imported fixture; a row is stored only when every warning code it declares in warning_codes (a JSON array) has its own acceptance for this run and source row. A row with no confirmed start time is stored as TBC and never as a confirmed time
 
 - Access: club-manager; roles: admin, convenor, manager; audience: manager.
 - Idempotency: idempotent. Audit: record with `record_audit_event`.
@@ -278,7 +280,7 @@ Create or update an imported fixture; a row with no confirmed start time is stor
 | `source_date_raw` | string; default null |
 | `source_time_raw` | string; default null |
 | `import_run_id` | string; default null |
-| `warning_count` | integer; default 0; min 0 |
+| `warning_codes` | string |
 
 Returns: `changes`: rows written; 0 means not applied.
 
@@ -865,7 +867,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `record_import_run_issues`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1167,6 +1169,37 @@ Record that a manager accepted a warning for one source row of an import run; bl
 | `source_row` | integer; min 1 |
 
 Returns: `changes`: rows written; 0 means not applied.
+
+### `record_import_run_issues`
+
+Store the row-level issues (blocking and warning) that a fixture import check reported, on its import run. Each issue is stored once per run, source row and code; replaying the same list adds nothing. Only managers of the run's club can record them
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `import_run_id` | string |
+| `issues` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_import_run_issues`
+
+List the row-level issues stored for one fixture import run, in source line order. Only managers of the run's club can read them
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `import_run_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `source_row`, `severity`, `code`, `field`, `message`, `remediation`, `updated_at`
 
 ### `apply_draw_seasons`
 

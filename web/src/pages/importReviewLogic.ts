@@ -44,3 +44,6 @@ export function fingerprint(sha256: string | null): string {
 export function reportDate(createdAt: number): string {
   return new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Melbourne', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(createdAt))
 }
+
+export type RunIssue = { source_row: number; severity: 'blocking' | 'warning'; code: string; field: string | null; message: string | null; remediation: string | null }
+export const issueSeverityLabel = (severity: RunIssue['severity']) => (severity === 'blocking' ? 'Blocking' : 'Warning')

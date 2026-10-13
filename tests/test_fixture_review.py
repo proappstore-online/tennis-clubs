@@ -34,7 +34,7 @@ class FixtureReviewTests(unittest.TestCase):
 
     def upsert(self, fixture_id, user="conv-a", **values):
         base = {"id": fixture_id, "org_id": "a", "home_team_id": "ta", "away_team_id": "tb", "venue_id": "va",
-                "starts_at": "2026-05-16T15:00:00+10:00", "round_label": fixture_id, "season": "2026", "time_status": "confirmed"}
+                "starts_at": "2026-05-16T15:00:00+10:00", "round_label": fixture_id, "season": "2026", "time_status": "confirmed", "warning_codes": "[]"}
         return self.run_action("upsert_imported_fixture", user, **{**base, **values})
 
     def approve(self, fixture_id, user="conv-a"):

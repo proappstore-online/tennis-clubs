@@ -126,7 +126,7 @@ class FixtureRosterImportTests(unittest.TestCase):
             "org_id": "club-1", "home_team_id": "home", "away_team_id": "away",
             "starts_at": "2026-05-02T09:00:00+10:00", "round_label": "Round 1",
             "season": "2026", "__user_id": "manager-1", "__now": 100,
-            "venue_id": "venue-1", "id": "first-random-id",
+            "venue_id": "venue-1", "id": "first-random-id", "warning_codes": "[]",
         }
         conn.execute(fixture_action["sql"], params)
         params.update({"venue_id": "venue-2", "id": "second-random-id", "__now": 200})

@@ -140,7 +140,7 @@ class FixtureTimingTests(unittest.TestCase):
 
     def upsert(self, **values):
         base = {"id": "f-new", "org_id": "a", "home_team_id": "ta", "away_team_id": "tb", "venue_id": "va",
-                "starts_at": "2026-05-16T00:00:00+10:00", "round_label": "R3", "season": "2026"}
+                "starts_at": "2026-05-16T00:00:00+10:00", "round_label": "R3", "season": "2026", "warning_codes": "[]"}
         return self.run_action("upsert_imported_fixture", "conv-a", **{**base, **values})
 
     def test_import_stores_time_status_arrival_and_provenance_and_players_see_only_timing(self):
@@ -170,14 +170,39 @@ class FixtureTimingTests(unittest.TestCase):
         rows = self.db.execute("SELECT starts_at,time_status,source_row FROM fixtures WHERE round_label='R3'").fetchall()
         self.assertEqual([tuple(r) for r in rows], [("2026-05-16T15:00:00+10:00", "confirmed", 5)])
 
-    def test_warnings_need_an_explicit_acknowledgement_before_import(self):
-        blocked = self.upsert(warning_count=1, import_run_id="run-3")
-        self.assertEqual(blocked.rowcount, 0)
+    def test_each_declared_warning_code_needs_its_own_acceptance_for_its_row(self):
+        codes = json.dumps(["start_time_missing"])
+        self.assertEqual(self.upsert(source_row=2, warning_codes=codes, import_run_id="run-3").rowcount, 0)
         self.assertEqual(self.run_action("record_fixture_import_resolution", "conv-a", id="res-1", org_id="a", import_run_id="run-3", code="start_time_missing", source_row=2).rowcount, 1)
         self.assertEqual(self.run_action("record_fixture_import_resolution", "conv-a", id="res-2", org_id="a", import_run_id="run-3", code="start_time_missing", source_row=2).rowcount, 0)
-        self.assertEqual(self.upsert(warning_count=1, import_run_id="run-3").rowcount, 1)
+        self.assertEqual(self.upsert(source_row=2, warning_codes=codes, import_run_id="run-3").rowcount, 1)
         self.assertEqual(self.run_action("record_fixture_import_resolution", "conv-a", id="res-3", org_id="a", import_run_id="run-3", code="team_not_found", source_row=2).rowcount, 0)
         self.assertEqual(self.run_action("record_fixture_import_resolution", "play-a", id="res-4", org_id="a", import_run_id="run-3", code="start_time_missing", source_row=2).rowcount, 0)
+
+    def test_a_row_with_an_unaccepted_warning_code_is_refused(self):
+        codes = json.dumps(["estimated_time", "start_time_missing"])
+        self.run_action("record_fixture_import_resolution", "conv-a", id="res-p1", org_id="a", import_run_id="run-4", code="estimated_time", source_row=3)
+        self.assertEqual(self.upsert(id="f-partial", round_label="R4", source_row=3, warning_codes=codes, import_run_id="run-4").rowcount, 0)
+        self.run_action("record_fixture_import_resolution", "conv-a", id="res-p2", org_id="a", import_run_id="run-4", code="start_time_missing", source_row=3)
+        self.assertEqual(self.upsert(id="f-partial", round_label="R4", source_row=3, warning_codes=codes, import_run_id="run-4").rowcount, 1)
+
+    def test_one_acceptance_does_not_unlock_other_rows_codes_or_runs(self):
+        self.run_action("record_fixture_import_resolution", "conv-a", id="res-r1", org_id="a", import_run_id="run-5", code="start_time_missing", source_row=2)
+        other_row = self.upsert(id="f-row3", round_label="R5", source_row=3, warning_codes=json.dumps(["start_time_missing"]), import_run_id="run-5")
+        self.assertEqual(other_row.rowcount, 0)
+        other_code = self.upsert(id="f-row2b", round_label="R6", source_row=2, warning_codes=json.dumps(["estimated_time"]), import_run_id="run-5")
+        self.assertEqual(other_code.rowcount, 0)
+        same_row = self.upsert(id="f-row2", round_label="R7", source_row=2, warning_codes=json.dumps(["start_time_missing"]), import_run_id="run-5")
+        self.assertEqual(same_row.rowcount, 1)
+        other_run = self.upsert(id="f-run6", round_label="R8", source_row=2, warning_codes=json.dumps(["start_time_missing"]), import_run_id="run-6")
+        self.assertEqual(other_run.rowcount, 0)
+
+    def test_omitting_or_mistyping_the_warning_codes_does_not_bypass_the_gate(self):
+        self.assertEqual(self.upsert(id="f-none", round_label="R9", source_row=2, warning_codes=None, import_run_id="run-7").rowcount, 0)
+        self.assertEqual(self.upsert(id="f-obj", round_label="R10", source_row=2, warning_codes='{"start_time_missing": true}', import_run_id="run-7").rowcount, 0)
+        self.assertEqual(self.upsert(id="f-str", round_label="R11", source_row=2, warning_codes='"start_time_missing"', import_run_id="run-7").rowcount, 0)
+        # Known residual: a row that declares no warnings is not checked against the batch, so it imports.
+        self.assertEqual(self.upsert(id="f-empty", round_label="R12", source_row=2, warning_codes="[]", import_run_id="run-7").rowcount, 1)
 
     def test_import_report_stores_provenance_and_issue_counts(self):
         self.assertEqual(self.run_action("record_import_run", "conv-a", id="run-9", org_id="a", kind="fixtures", received_count=3, saved_count=2, rejected_count=1, status="saved",

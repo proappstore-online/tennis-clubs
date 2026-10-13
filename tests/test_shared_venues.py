@@ -47,7 +47,7 @@ class SharedVenueTests(unittest.TestCase):
 
     def upsert(self, venue_id, fixture_id="f-shared", user="conv-a"):
         return self.run_action("upsert_imported_fixture", user, id=fixture_id, org_id="a", home_team_id="ta", away_team_id="tb", venue_id=venue_id,
-                               starts_at="2026-05-23T14:00:00+10:00", round_label=fixture_id, season="2026", time_status="confirmed")
+                               starts_at="2026-05-23T14:00:00+10:00", round_label=fixture_id, season="2026", time_status="confirmed", warning_codes="[]")
 
     def test_only_the_owning_club_can_share_or_unshare_a_venue(self):
         self.assertEqual(self.run_action("set_venue_shared", "mgr-b", venue_id="vc", org_id="b", shared=1).rowcount, 1)

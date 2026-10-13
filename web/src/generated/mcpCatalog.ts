@@ -172,7 +172,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "upsert_imported_fixture",
-    "description": "Create or update an imported fixture; a row with no confirmed start time is stored as TBC and never as a confirmed time",
+    "description": "Create or update an imported fixture; a row is stored only when every warning code it declares in warning_codes (a JSON array) has its own acceptance for this run and source row. A row with no confirmed start time is stored as TBC and never as a confirmed time",
     "operation": "execute",
     "roles": [
       "admin",
@@ -255,10 +255,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "default": null
       },
       {
-        "name": "warning_count",
-        "type": "integer",
-        "default": 0,
-        "min": 0
+        "name": "warning_codes",
+        "type": "string"
       }
     ]
   },
@@ -1606,6 +1604,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "reconcile_imported_fixture_time",
           "record_draw_import_outcomes",
           "record_draw_import_run",
+          "record_import_run_issues",
           "register_document",
           "remove_fixture_roster_player",
           "schedule_fixture",
@@ -2349,6 +2348,75 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "name": "source_row",
         "type": "integer",
         "min": 1
+      }
+    ]
+  },
+  {
+    "name": "record_import_run_issues",
+    "description": "Store the row-level issues (blocking and warning) that a fixture import check reported, on its import run. Each issue is stored once per run, source row and code; replaying the same list adds nothing. Only managers of the run's club can record them",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      },
+      {
+        "name": "issues",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_import_run_issues",
+    "description": "List the row-level issues stored for one fixture import run, in source line order. Only managers of the run's club can read them",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": true,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "import_run_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   },

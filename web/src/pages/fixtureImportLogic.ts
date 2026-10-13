@@ -86,3 +86,35 @@ export function mapFixtureRows(parsed: Record<string, string>[], options: Fixtur
   // retained as empty strings so the component can show those errors.
   return mapped as FixtureRow[]
 }
+
+export type ValidationIssue = { source_row: number; severity: 'blocking' | 'warning'; code: string; field: string; message: string; remediation: string }
+
+// The warning codes a row declares. The server stores the row only when each code has its own acceptance for that run and row.
+export function warningCodesFor(issues: ValidationIssue[], sourceRow: number): string[] {
+  return [...new Set(issues.filter((issue) => issue.severity === 'warning' && issue.source_row === sourceRow).map((issue) => issue.code))].sort()
+}
+
+export function upsertFixtureArgs(row: FixtureRow, importRunId: string, issues: ValidationIssue[], id: string): Record<string, unknown> {
+  return {
+    id,
+    org_id: row.org_id,
+    home_team_id: row.home_team_id,
+    away_team_id: row.away_team_id,
+    venue_id: row.venue_id,
+    starts_at: row.starts_at,
+    round_label: row.round.trim(),
+    season: row.season.trim(),
+    time_status: row.timing_status,
+    arrival_at: row.arrival_at,
+    source_row: row.source_row,
+    source_date_raw: row.source_date_raw,
+    source_time_raw: row.start_time ?? '',
+    import_run_id: importRunId,
+    warning_codes: JSON.stringify(warningCodesFor(issues, row.source_row)),
+  }
+}
+
+// The issue list stored on the import run: every blocking and warning issue, with its row and text.
+export function issueRecords(issues: ValidationIssue[]): ValidationIssue[] {
+  return issues.map(({ source_row, severity, code, field, message, remediation }) => ({ source_row, severity, code, field, message, remediation }))
+}
