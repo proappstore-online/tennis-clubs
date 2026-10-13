@@ -175,7 +175,7 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     </>}
     <details className="mt-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
       <summary className="cursor-pointer font-bold text-[var(--ink)]">Integration actions ({MCP_CATALOG.length})</summary>
-      <p className="mt-3 text-sm text-[var(--muted)]">Actions available to club systems through the ProAppStore MCP. Each call is checked against the caller’s club membership on the server. Contract details are in docs/mcp-contract.md.</p>
+      <p className="mt-3 text-sm text-[var(--muted)]">Actions available to connected club systems. Each call is checked against the caller’s club membership on the server.</p>
       <ul className="mt-3 divide-y divide-[var(--line)] text-sm">{MCP_CATALOG.map((action) => <li key={action.name} className="py-3"><code className="font-semibold text-[var(--ink)]">{action.name}</code><p className="mt-1 text-[var(--muted)]">{action.description}</p><p className="mt-1 text-xs text-[var(--muted)]">Roles: {action.roles.join(', ') || action.access} · {action.idempotency}{action.audit ? ' · audited' : ''}</p></li>)}</ul>
     </details>
   </main>

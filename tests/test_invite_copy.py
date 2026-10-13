@@ -7,6 +7,8 @@ ROOT = Path(__file__).resolve().parents[1]
 # Everything the browser renders: app sources (including comments, so they stay clean), the generated action catalog and manifest descriptions it shows.
 RENDERED = [*ROOT.joinpath("web", "src").rglob("*.ts"), *ROOT.joinpath("web", "src").rglob("*.tsx")]
 PLATFORM_TERMS = re.compile(r"\bPAS\b|platform|delegat|internal group|app worker", re.IGNORECASE)
+# Manifest descriptions are shown verbatim to club admins, so the product name is checked there too.
+MANIFEST_TERMS = re.compile(PLATFORM_TERMS.pattern + r"|proappstore", re.IGNORECASE)
 
 
 class InviteCopyTests(unittest.TestCase):
@@ -21,7 +23,7 @@ class InviteCopyTests(unittest.TestCase):
 
     def test_manifest_descriptions_shown_in_the_admin_catalog_are_platform_free(self):
         tools = json.loads((ROOT / "mcp.json").read_text())["tools"]
-        offenders = [tool["name"] for tool in tools if PLATFORM_TERMS.search(tool.get("description", ""))]
+        offenders = [tool["name"] for tool in tools if MANIFEST_TERMS.search(tool.get("description", ""))]
         self.assertEqual(offenders, [])
 
     def test_invites_keep_one_use_and_seven_day_expiry(self):

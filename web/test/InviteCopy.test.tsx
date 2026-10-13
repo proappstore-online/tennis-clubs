@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 // The rendered invitation flow must never show platform or implementation terms.
-const PLATFORM_TERMS = /\bPAS\b|platform|delegat|internal group|app worker/i
+const PLATFORM_TERMS = /\bPAS\b|platform|delegat|internal group|app worker|proappstore/i
 
 const { mockApp } = vi.hoisted(() => {
   const app = {
