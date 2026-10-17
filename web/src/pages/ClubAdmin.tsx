@@ -11,6 +11,7 @@ type Venue = { id: string; org_id: string; name: string; address: string | null;
 type ContactDetail = { id: string; subject_type: 'person' | 'team' | 'venue' | 'club'; subject_id: string; label: string; kind: 'phone' | 'email' | 'postal' | 'other'; value: string; updated_at: number }
 type Team = { id: string; name: string; division_id: string | null; division_name: string | null; season_name: string | null }
 type Member = { id: string; display_name: string; role: string; user_id: string }
+type MembershipClub = { id: string; name: string; role: string }
 type Rows<T> = { rows: T[] }
 type FirstClubSetup = { eligible: number; pending_org_id?: string | null; pending_club_name?: string | null }
 const field = 'mt-1 min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]'
@@ -19,6 +20,7 @@ const id = () => crypto.randomUUID()
 
 export default function ClubAdmin({ app }: { app: ProAppStore }) {
   const [clubs, setClubs] = useState<Club[]>([])
+  const [memberClubs, setMemberClubs] = useState<MembershipClub[]>([])
   const [clubId, setClubId] = useState('')
   const [seasons, setSeasons] = useState<Season[]>([])
   const [divisions, setDivisions] = useState<Division[]>([])
@@ -39,13 +41,14 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     setLoadingClubs(true)
     setError('')
     try {
-      const [result, eligibility] = await Promise.all([
+      const [result, memberships, eligibility] = await Promise.all([
         app.actions.call<Rows<Club>>('list_managed_clubs', {}),
+        app.actions.call<Rows<MembershipClub>>('list_my_clubs', {}),
         app.actions.call<Rows<FirstClubSetup>>('can_create_first_club', {}),
       ])
       const next = result.rows ?? []
       const setup = eligibility.rows?.[0]
-      setClubs(next); setCanCreateClub(setup?.eligible === 1)
+      setClubs(next); setMemberClubs(memberships.rows ?? []); setCanCreateClub(setup?.eligible === 1)
       setPendingClub(setup?.pending_org_id && setup.pending_club_name ? { id: setup.pending_org_id, name: setup.pending_club_name } : null)
       setClubId((current) => next.some((item) => item.id === current) ? current : next[0]?.id ?? '')
     } catch { setError('Club access could not be loaded. Sign in again or ask a club administrator for access.') }
@@ -149,10 +152,11 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     {message && <p className="mt-5 rounded-xl bg-[var(--mint-soft)] p-4 text-sm text-[var(--mint-deep)]" role="status">{message}</p>}
     {loadingClubs && <p className="mt-7 text-sm text-[var(--muted)]" role="status">Loading club access…</p>}
     {inviteLink && <div className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 text-sm"><label htmlFor="invite-link" className="font-semibold text-[var(--ink)]">Invite link</label><input id="invite-link" readOnly value={inviteLink} className={field} onFocus={(event) => event.currentTarget.select()} /></div>}
-    {!loadingClubs && canCreateClub && clubs.length === 0 && <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7"><h2 className="display-font text-2xl font-bold text-[var(--ink)]">Create your club</h2><p className="mt-2 text-sm leading-6 text-[var(--muted)]">Start your club setup. You’ll become its administrator and can add seasons, teams and venues next.</p><form onSubmit={(event) => void createClub(event)} className="mt-4 flex flex-col gap-3 sm:flex-row"><input aria-label="Club name" name="club_name" required maxLength={100} placeholder="Club name" className={field} /><button aria-label="Create your club" className={button} disabled={busy}>{busy ? 'Creating…' : 'Create your club'}</button></form></section>}
+    {!loadingClubs && canCreateClub && clubs.length === 0 && <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7"><h2 className="display-font text-2xl font-bold text-[var(--ink)]">Create a new club</h2><p className="mt-2 text-sm leading-6 text-[var(--muted)]">Start a new club setup. You’ll become its administrator and can add seasons, teams and venues next.</p><p className="mt-2 text-sm leading-6 text-[var(--muted)]">This account has no club memberships. If you already set up a club, sign in with the original Google account or ask a current club administrator to add you back. Creating a club here will not restore access to an existing club.</p><form onSubmit={(event) => void createClub(event)} className="mt-4 flex flex-col gap-3 sm:flex-row"><input aria-label="Club name" name="club_name" required maxLength={100} placeholder="Club name" className={field} /><label className="flex items-start gap-2 text-sm leading-5 text-[var(--ink)] sm:self-center"><input type="checkbox" name="confirm_new_club" required className="mt-1 size-4" />I’m starting a new club, not restoring access to an existing club.</label><button aria-label="Create your club" className={button} disabled={busy}>{busy ? 'Creating…' : 'Create your club'}</button></form></section>}
     {!loadingClubs && pendingClub && clubs.length === 0 && <section className="mt-7 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7"><h2 className="display-font text-2xl font-bold text-[var(--ink)]">Finish setting up {pendingClub.name}</h2><p className="mt-2 text-sm leading-6 text-[var(--muted)]">The club was created, but administrator access still needs to be set up. Resume setup to finish without creating another club.</p><button type="button" className={`${button} mt-4`} disabled={busy} onClick={() => void resumeFirstClubSetup()}>{busy ? 'Setting up…' : 'Resume club setup'}</button></section>}
     {!loadingClubs && clubs.length > 0 && <label className="mt-7 block max-w-xl text-sm font-semibold text-[var(--ink)]">Club<select className={field} value={clubId} onChange={(event) => setClubId(event.target.value)}>{clubs.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role}</option>)}</select></label>}
-    {!loadingClubs && !clubs.length && !canCreateClub && <p className="mt-7 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">You don’t have club administration access yet. Ask a club administrator to add you as a manager.</p>}
+    {!loadingClubs && !clubs.length && !canCreateClub && memberClubs.length > 0 && <p className="mt-7 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">You belong to {memberClubs.map((item) => item.name).join(', ')}, but don’t have club administration access. Ask a club administrator to make you a manager, convenor or administrator.</p>}
+    {!loadingClubs && !clubs.length && !canCreateClub && !pendingClub && memberClubs.length === 0 && <p className="mt-7 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">You don’t have club administration access yet. Ask a club administrator to add you as a manager.</p>}
     {!loadingClubs && club && <>
       <section className="mt-7 grid gap-4 md:grid-cols-2">
         <form onSubmit={(event) => { event.preventDefault(); const f = new FormData(event.currentTarget); void runAction('create_season', { id: id(), org_id: clubId, name: String(f.get('name')), starts_on: String(f.get('starts_on')), ends_on: String(f.get('ends_on')), status: 'upcoming' }, 'Season created.') }} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5"><h2 className="font-bold text-[var(--ink)]">Season</h2><input aria-label="Season name" name="name" required placeholder="Season name" className={field} /><div className="mt-2 grid grid-cols-2 gap-2"><input aria-label="Season starts on" type="date" name="starts_on" required className={field} /><input aria-label="Season ends on" type="date" name="ends_on" required className={field} /></div><button className={`${button} mt-3`} disabled={busy}>Add season</button></form>

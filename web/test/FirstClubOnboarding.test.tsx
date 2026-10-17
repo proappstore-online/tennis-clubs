@@ -44,6 +44,7 @@ function resetStore(user: SyntheticUser = { id: 'user-1', login: 'testuser' }) {
     if (name === 'list_managed_clubs') {
       return { rows: mockStore.clubs.filter((club) => club.role === 'admin' || club.role === 'manager') }
     }
+    if (name === 'list_my_clubs') return { rows: mockStore.clubs.filter((club) => club.role) }
     if (name === 'can_create_first_club') {
       const userId = mockApp.auth.user?.id
       if (!userId || mockStore.clubs.some((club) => club.role)) return { rows: [] }
@@ -90,6 +91,11 @@ function renderClubAdmin() {
   return render(<ClubAdmin app={mockApp as unknown as ProAppStore} />)
 }
 
+function confirmNewClub() {
+  const confirmation = screen.getByRole('checkbox', { name: 'I’m starting a new club, not restoring access to an existing club.' }) as HTMLInputElement
+  if (!confirmation.checked) fireEvent.click(confirmation)
+}
+
 describe('real ClubAdmin first-club onboarding', () => {
   beforeEach(() => resetStore())
   afterEach(() => cleanup())
@@ -97,8 +103,10 @@ describe('real ClubAdmin first-club onboarding', () => {
   it('lets a fresh signed-in user create a club and reach its setup view', async () => {
     renderClubAdmin()
 
-    expect(await screen.findByRole('heading', { name: 'Create your club' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Create a new club' })).toBeTruthy()
+    expect(screen.getByText('This account has no club memberships. If you already set up a club, sign in with the original Google account or ask a current club administrator to add you back. Creating a club here will not restore access to an existing club.')).toBeTruthy()
     fireEvent.change(screen.getByRole('textbox', { name: 'Club name' }), { target: { value: 'Synthetic Tennis Club' } })
+    confirmNewClub()
     fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
 
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('create_club', expect.objectContaining({ name: 'Synthetic Tennis Club' })))
@@ -112,8 +120,8 @@ describe('real ClubAdmin first-club onboarding', () => {
     mockStore.clubs.push({ id: 'club-existing', name: 'Existing Club', slug: 'existing-club', role: 'player' })
     renderClubAdmin()
 
-    expect(await screen.findByText('You don’t have club administration access yet. Ask a club administrator to add you as a manager.')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Create your club' })).toBeNull()
+    expect(await screen.findByText('You belong to Existing Club, but don’t have club administration access. Ask a club administrator to make you a manager, convenor or administrator.')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Create a new club' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Club name' })).toBeNull()
   })
 
@@ -122,12 +130,12 @@ describe('real ClubAdmin first-club onboarding', () => {
     renderClubAdmin()
 
     expect(await screen.findByText('You don’t have club administration access yet. Ask a club administrator to add you as a manager.')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Create your club' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Create a new club' })).toBeNull()
   })
 
   it('prevents submitting a blank club name', async () => {
     renderClubAdmin()
-    await screen.findByRole('heading', { name: 'Create your club' })
+    await screen.findByRole('heading', { name: 'Create a new club' })
 
     const nameField = screen.getByRole('textbox', { name: 'Club name' }) as HTMLInputElement
     expect(nameField.required).toBe(true)
@@ -137,15 +145,29 @@ describe('real ClubAdmin first-club onboarding', () => {
     expect(mockApp.actions.call).not.toHaveBeenCalledWith('bootstrap_club_admin', expect.anything())
   })
 
+  it('requires an explicit acknowledgement before creating a new club', async () => {
+    renderClubAdmin()
+    await screen.findByRole('heading', { name: 'Create a new club' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Club name' }), { target: { value: 'Deliberate Club' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
+
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('create_club', expect.anything())
+    confirmNewClub()
+    fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
+    await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('create_club', expect.objectContaining({ name: 'Deliberate Club' })))
+  })
+
   it('shows a failed create request, then permits retry without creating duplicates', async () => {
     mockStore.failNextCreate = true
     renderClubAdmin()
-    await screen.findByRole('heading', { name: 'Create your club' })
+    await screen.findByRole('heading', { name: 'Create a new club' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Club name' }), { target: { value: 'Retry Club' } })
+    confirmNewClub()
     fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Synthetic create failure. Please try again.')
     expect(mockStore.clubs).toHaveLength(0)
+    confirmNewClub()
     fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
 
     expect((await screen.findByRole('status')).textContent).toContain('Retry Club is ready. You are its administrator.')
@@ -157,8 +179,9 @@ describe('real ClubAdmin first-club onboarding', () => {
   it('recovers persisted create success after bootstrap interruption and reloads to retry', async () => {
     mockStore.failNextBootstrap = true
     const first = renderClubAdmin()
-    await screen.findByRole('heading', { name: 'Create your club' })
+    await screen.findByRole('heading', { name: 'Create a new club' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Club name' }), { target: { value: 'Interrupted Club' } })
+    confirmNewClub()
     fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('Synthetic bootstrap interruption')
@@ -169,7 +192,7 @@ describe('real ClubAdmin first-club onboarding', () => {
 
     renderClubAdmin()
     expect(await screen.findByRole('heading', { name: 'Finish setting up Interrupted Club' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Create your club' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Create a new club' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Resume club setup' }))
 
     expect((await screen.findByRole('status')).textContent).toContain('Interrupted Club is ready. You are its administrator.')
@@ -198,13 +221,14 @@ describe('real ClubAdmin first-club onboarding', () => {
     renderClubAdmin()
     expect(screen.getByRole('status').textContent).toContain('Loading club access')
     release?.({ rows: [] })
-    expect(await screen.findByRole('heading', { name: 'Create your club' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Create a new club' })).toBeTruthy()
   })
 
   it('shows the created club after remounting from persistent synthetic store state', async () => {
     const first = renderClubAdmin()
-    await screen.findByRole('heading', { name: 'Create your club' })
+    await screen.findByRole('heading', { name: 'Create a new club' })
     fireEvent.change(screen.getByRole('textbox', { name: 'Club name' }), { target: { value: 'Persistent Club' } })
+    confirmNewClub()
     fireEvent.click(screen.getByRole('button', { name: 'Create your club' }))
     expect((await screen.findByRole('status')).textContent).toContain('Persistent Club is ready. You are its administrator.')
 
@@ -212,6 +236,6 @@ describe('real ClubAdmin first-club onboarding', () => {
     renderClubAdmin()
 
     expect((await screen.findByRole('combobox', { name: 'Club' })).textContent).toContain('Persistent Club · admin')
-    expect(screen.queryByRole('heading', { name: 'Create your club' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Create a new club' })).toBeNull()
   })
 })
