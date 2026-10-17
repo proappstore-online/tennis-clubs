@@ -1,5 +1,5 @@
 export type FixtureOption = { kind: 'team' | 'venue' | 'external_club'; id: string; name: string; org_id: string; division_id?: string | null; season_name?: string | null; aliases?: string | null; shared?: number | null }
-export type FixtureRow = { date: string; round: string; opponent: string; home_away: string; venue: string; team: string; season: string; start_time?: string; arrival_time?: string; time_status?: string; timezone?: string; source_row: number; source_date_raw: string; org_id?: string; division_id?: string | null; home_team_id?: string; away_team_id?: string; venue_id?: string; timing_status: 'confirmed' | 'estimated' | 'tbc'; starts_at: string; arrival_at: string | null; issue?: string }
+export type FixtureRow = { date: string; round: string; opponent: string; opponent_name?: string; home_away: string; venue: string; team: string; season: string; start_time?: string; arrival_time?: string; time_status?: string; timezone?: string; source_row: number; source_date_raw: string; org_id?: string; division_id?: string | null; home_team_id?: string; away_team_id?: string; venue_id?: string; timing_status: 'confirmed' | 'estimated' | 'tbc'; starts_at: string; arrival_at: string | null; issue?: string }
 
 export function normalizeClubName(value: string): string {
   return value.toLowerCase().replace(/ +/g, ' ').trim()
@@ -79,8 +79,11 @@ export function mapFixtureRows(parsed: Record<string, string>[], options: Fixtur
     const sharedVenues = venueNamed.filter((item) => item.shared && item.org_id !== team?.org_id)
     const venue = ownVenue ?? (sharedVenues.length === 1 ? sharedVenues[0] : undefined)
     const date = normalizeDate(row.date)
+    // A date that does not parse has no start to compute; its `invalid date` issue blocks the row.
+    const timing = date ? fixtureTiming({ date, start_time: row.start_time, arrival_time: row.arrival_time, time_status: row.time_status }) : { timing_status: 'tbc' as const, starts_at: '', arrival_at: null }
     const problems = [!date && 'invalid date', !row.round?.trim() && 'missing round', !row.opponent?.trim() && 'missing opponent', !['home', 'away'].includes(row.home_away?.trim().toLowerCase()) && 'home_away must be home or away', !row.team?.trim() && 'missing team', !row.venue?.trim() && 'missing venue', !row.season?.trim() && 'missing season', row.team && !team && 'team not found', row.opponent && team && !opponent && 'opponent team not found', row.venue && team && !venue && 'venue not found', team && team.season_name?.toLowerCase() !== row.season.trim().toLowerCase() && 'team is not assigned to this season'].filter(Boolean)
-    return { ...row, date: date ?? row.date, source_row: index + 2, source_date_raw: row.date, ...fixtureTiming({ date: date ?? row.date, start_time: row.start_time, arrival_time: row.arrival_time, time_status: row.time_status }), org_id: team?.org_id, division_id: team?.division_id, home_team_id: row.home_away?.trim().toLowerCase() === 'home' ? team?.id : opponent?.id, away_team_id: row.home_away?.trim().toLowerCase() === 'home' ? opponent?.id : team?.id, venue_id: venue?.id, issue: problems.join(', ') }
+    // The canonical name is what the club's team or external club is stored under, so the roster can match it.
+    return { ...row, date: date ?? row.date, source_row: index + 2, source_date_raw: row.date, ...timing, opponent_name: opponent?.name ?? row.opponent, org_id: team?.org_id, division_id: team?.division_id, home_team_id: row.home_away?.trim().toLowerCase() === 'home' ? team?.id : opponent?.id, away_team_id: row.home_away?.trim().toLowerCase() === 'home' ? opponent?.id : team?.id, venue_id: venue?.id, issue: problems.join(', ') }
   })
   // CSV headers are validated row by row through `issue`; missing values are
   // retained as empty strings so the component can show those errors.

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
-import { recordAudit } from './auditTrail'
+import { outcomeOf, recordAudit } from './auditTrail'
 import { issueRecords, mapFixtureRows, normalizeDate, parseCsv, upsertFixtureArgs, type FixtureOption, type FixtureRow, type ValidationIssue } from './fixtureImportLogic'
 
 type Option = FixtureOption
@@ -107,24 +107,29 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
     const orgIds = [...new Set(fixtures.map((row) => row.org_id).filter((value): value is string => Boolean(value)))]
     const orgId = orgIds[0]
     const counts = { blocking: blocking.length, warnings: warnings.length, acknowledged: acknowledged.length }
+    let saved = 0
     try {
       if (orgIds.length > 1) throw new Error('Import one club at a time.')
       if (!reviewComplete) throw new Error('Resolve every blocking issue and accept every warning before saving.')
       for (const row of fixtures) {
         if (row.issue) throw new Error('Fix all fixture validation errors before saving.')
         await app.actions.call('reconcile_imported_fixture_time', { org_id: row.org_id, round_label: row.round.trim(), home_team_id: row.home_team_id, away_team_id: row.away_team_id, starts_at: row.starts_at, time_status: row.timing_status, arrival_at: row.arrival_at, source_row: row.source_row, source_date_raw: row.source_date_raw, source_time_raw: row.start_time ?? '', import_run_id: runId })
-        await app.actions.call('upsert_imported_fixture', upsertFixtureArgs(row, runId, issues ?? [], crypto.randomUUID()))
+        const stored = await app.actions.call('upsert_imported_fixture', upsertFixtureArgs(row, runId, issues ?? [], crypto.randomUUID()))
+        // The server stores a row only when its guards pass; a row it did not store is not counted as saved.
+        if (outcomeOf(stored) === 'succeeded') saved++
       }
       for (const row of roster) {
         if (row.issue) throw new Error('Fix all roster validation errors before saving.')
         const fixture = fixtures.find((item) => item.date === row.fixture_date && item.round.trim().toLowerCase() === row.fixture_round.trim().toLowerCase() && (item.opponent.trim().toLowerCase() === row.fixture_opponent.trim().toLowerCase() || item.team.trim().toLowerCase() === row.fixture_opponent.trim().toLowerCase()))
         if (!fixture?.org_id) throw new Error('A roster entry refers to an unimported fixture.')
-        await app.actions.call('upsert_imported_roster_player', { id: crypto.randomUUID(), org_id: fixture.org_id, starts_at: fixture.starts_at, round_label: fixture.round.trim(), team: fixture.team.trim(), opponent: fixture.opponent.trim(), player_name: row.player_name.trim() })
+        await app.actions.call('upsert_imported_roster_player', { id: crypto.randomUUID(), org_id: fixture.org_id, starts_at: fixture.starts_at, round_label: fixture.round.trim(), team: fixture.team.trim(), opponent: (fixture.opponent_name ?? fixture.opponent).trim(), player_name: row.player_name.trim() })
       }
-      const recorded = [await recordImport(orgId, 'fixtures', fixtures.length, fixtures.length, 'saved', runId, counts), await recordImport(orgId, 'roster', roster.length, roster.length, 'saved', crypto.randomUUID(), counts), await recordIssues(orgId, runId)]
-      setMessage(`Saved ${fixtures.length} fixture rows and ${roster.length} roster rows.${recorded.every(Boolean) ? '' : ' The import report could not be written.'}`)
+      const recorded = [await recordImport(orgId, 'fixtures', fixtures.length, saved, 'saved', runId, counts), await recordImport(orgId, 'roster', roster.length, roster.length, 'saved', crypto.randomUUID(), counts), await recordIssues(orgId, runId)]
+      const skipped = fixtures.length - saved
+      setMessage(`Saved ${saved} of ${fixtures.length} fixture rows and ${roster.length} roster rows.${skipped ? ` ${skipped} fixture rows were not stored; the stored time may be more certain. See the import report.` : ''}${recorded.every(Boolean) ? '' : ' The import report could not be written.'}`)
     } catch (error) {
-      await recordImport(orgId, 'fixtures', fixtures.length, 0, 'rejected', runId, counts)
+      // Rows stored before the failure stay stored, so the report counts them rather than zero.
+      await recordImport(orgId, 'fixtures', fixtures.length, saved, 'rejected', runId, counts)
       await recordIssues(orgId, runId)
       setMessage(error instanceof Error ? error.message : 'Import failed. Please check your files and try again.')
     }

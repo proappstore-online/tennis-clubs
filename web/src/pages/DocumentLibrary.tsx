@@ -94,6 +94,8 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
     const problem = documentFileProblem(file)
     if (problem) { setNotice(problem); return }
     setBusy(true); setNotice('')
+    // Once the metadata is registered, a retry must not register it again: the form clears and the document gets its file from its own row.
+    let registeredId = ''
     try {
       const sha256 = await sha256Of(await file.arrayBuffer())
       const id = crypto.randomUUID()
@@ -104,13 +106,15 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
         content_type: file.type, byte_size: file.size, sha256,
       })
       if (outcomeOf(registered) === 'refused') { setNotice('The document could not be added. Check the details and try again.'); return }
+      registeredId = id
       const status = await uploadFile(id, file)
       setNotice(status === 201 ? 'Document added and file uploaded.' : `Document added, but ${uploadMessage(status)}`)
-      setForm(emptyForm); setFile(null)
-      setReloadKey((key) => key + 1)
     } catch {
-      setNotice('The document could not be added. Try again.')
-    } finally { setBusy(false) }
+      setNotice(registeredId ? 'The document was added, but its file was not uploaded. Use Upload file on the document to finish.' : 'The document could not be added. Try again.')
+    } finally {
+      if (registeredId) { setForm(emptyForm); setFile(null); setReloadKey((key) => key + 1) }
+      setBusy(false)
+    }
   }
 
   async function uploadExisting(item: Document, chosen: File | undefined) {

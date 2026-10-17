@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { fixtureStartLabel } from '../fixtureTime'
 import { outcomeOf, recordAudit } from './auditTrail'
+import { listAllRows } from './listAllRows'
 import { approvalLabel, awaitingReview, fingerprint, issueSeverityLabel, latestRun, managerClubs, provenanceRows, reportDate, type Club, type ImportRun, type ManagedFixture, type RunIssue } from './importReviewLogic'
 
 const kindLabel = (kind: ImportRun['kind']) => (kind === 'fixtures' ? 'Fixture book' : 'Team roster')
@@ -26,8 +27,9 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
   const loadFixtures = useCallback(async () => {
     setFixturesLoading(true)
     try {
-      const result = await app.actions.call<{ rows: ManagedFixture[] }>('list_managed_fixtures', { limit: 100 })
-      setFixtures(result.rows ?? [])
+      // Every page, so a fixture beyond the first 100 can still be reviewed.
+      const rows = await listAllRows<ManagedFixture>((offset) => app.actions.call<{ rows: ManagedFixture[] }>('list_managed_fixtures', { limit: 100, offset }))
+      setFixtures(rows)
       setFixturesReady(true)
     } catch { setError('Imported fixtures could not be loaded.') }
     finally { setFixturesLoading(false) }
@@ -123,7 +125,7 @@ export default function ImportReview({ app }: { app: ProAppStore }) {
           </>}
         </section>)}
       </div>}
-      <p className="mt-4 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">Row-by-row warnings and conflicts are not stored with a saved import. They are listed when you check a file on the Import page, which also records each accepted warning.</p>
+      <p className="mt-4 rounded-xl bg-[var(--paper-deep)] p-4 text-sm text-[var(--ink)]">Row-by-row warnings and conflicts from the latest fixture book are listed below. Each warning a manager accepted was recorded when the file was saved on the Import page.</p>
       <a href="/fixture-import" className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 font-semibold text-[var(--ink)]">Check a file on the Import page</a>
 
       <section className="mt-8">

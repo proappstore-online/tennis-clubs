@@ -55,6 +55,13 @@ class FixtureRosterTests(unittest.TestCase):
                 })
         return result
 
+    def test_roster_import_matches_team_and_opponent_names_as_the_fixture_book_does(self):
+        # The fixture book ignores case and surrounding spaces in names; the roster import must match the same way or it drops rows without an error.
+        self.db.execute("UPDATE fixtures SET round_label='R1' WHERE id='fa'")
+        result = self.db.execute(TOOLS["upsert_imported_roster_player"]["sql"], {"__user_id": "manager", "__now": 1234, "id": "imp-1", "org_id": "a", "starts_at": "2026-10-11T09:00:00+11:00", "round_label": "R1", "team": " team a ", "opponent": "TEAM B", "player_name": "Pat Player"})
+        self.assertEqual(result.rowcount, 1)
+        self.assertEqual(self.db.execute("SELECT player_name FROM roster_players WHERE fixture_id='fa'").fetchone()[0], "Pat Player")
+
     def test_registered_roster_actions_require_auth(self):
         names = ("list_managed_fixtures", "list_managed_fixture_roster", "list_fixture_team_candidates", "add_fixture_roster_player", "log_fixture_roster_added", "remove_fixture_roster_player", "log_fixture_roster_removed", "list_fixture_roster_activity", "list_fixture_roster", "set_my_fixture_availability", "log_my_fixture_availability_change")
         self.assertTrue(all(TOOLS[name]["requires_auth"] for name in names))

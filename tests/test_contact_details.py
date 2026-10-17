@@ -138,6 +138,22 @@ class ContactDetailTests(unittest.TestCase):
         for value in ("0400000001", "0400000002"):
             self.assertNotIn(value, serialised)
 
+    def test_formatted_phone_numbers_in_notes_are_withheld_from_players_and_flagged_for_managers(self):
+        # Spaced, hyphenated and dotted numbers have no run of seven digits, so the check must ignore separators as the import does.
+        self.db.execute("UPDATE venues SET notes='Ring 0400 000 003 on arrival' WHERE id='va'")
+        self.db.execute("UPDATE venues SET notes='Gate code: 0400-000-004' WHERE id='vb'")
+        self.db.execute("UPDATE fixtures SET match_notice='Call 0400.000.005 if late' WHERE id='fa'")
+        rounds = {row["round_label"]: row for row in self.rows("list_my_fixtures", "play-a", **{"from": "2026-01-01"})}
+        self.assertIsNone(rounds["R1"]["match_notice"])
+        self.assertIsNone(rounds["R1"]["venue_notes"])
+        self.assertIsNone(rounds["R2"]["venue_notes"])
+        serialised = json.dumps(list(rounds.values()))
+        for value in ("0400 000 003", "0400-000-004", "0400.000.005"):
+            self.assertNotIn(value, serialised)
+        flagged = self.rows("list_contact_note_review", "mgr-a", org_id="a")
+        self.assertEqual(sorted((row["subject_type"], row["subject_id"], row["field"]) for row in flagged),
+                         [("fixture", "fa", "match_notice"), ("fixture", "fb", "match_notice"), ("venue", "va", "notes"), ("venue", "vb", "notes"), ("venue", "vc", "notes")])
+
     def test_note_review_flags_contact_like_notes_for_managers_without_returning_the_text(self):
         flagged = self.rows("list_contact_note_review", "mgr-a", org_id="a")
         self.assertEqual(sorted((row["subject_type"], row["subject_id"], row["field"]) for row in flagged),
@@ -145,6 +161,11 @@ class ContactDetailTests(unittest.TestCase):
         self.assertNotIn("0400000001", json.dumps(flagged))
         self.assertEqual(self.rows("list_contact_note_review", "play-a", org_id="a"), [])
         self.assertEqual(self.rows("list_contact_note_review", "mgr-b", org_id="a"), [])
+
+    def test_upcoming_fixtures_compare_instants_across_timezone_offsets(self):
+        # 09:00 on 11 October in Melbourne (+11:00) is 22:00 UTC on 10 October, so it is before this 08:00 UTC cut-off; comparing the text would keep it.
+        upcoming = self.rows("list_my_fixtures", "play-a", **{"from": "2026-10-11T08:00:00.000Z"})
+        self.assertEqual([row["round_label"] for row in upcoming], ["R2"])
 
     def test_roster_imports_do_not_store_a_contact(self):
         self.run_action("upsert_imported_roster_player", "conv-a", id="rp2", org_id="a", starts_at="2026-10-11T09:00:00+11:00",

@@ -126,6 +126,44 @@ describe('fixture roster flows with isolated local fixtures', () => {
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('set_my_fixture_availability', { fixture_id: 'fixture-local', availability: 'pending' }))
   })
 
+  it('does not report a refused roster addition as added', async () => {
+    const base = mockApp.actions.call.getMockImplementation()!
+    mockApp.actions.call.mockImplementation(async (name: string, values: Record<string, unknown>) =>
+      name === 'add_fixture_roster_player' ? { changes: 0 } : base(name, values))
+    window.history.replaceState({}, '', '/rosters')
+    render(<App />)
+    expect(await screen.findByText('Sam Player')).toBeTruthy()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Player to add' }), { target: { value: 'player-2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add to roster' }))
+    expect(await screen.findByText('The roster change could not be saved.')).toBeTruthy()
+    expect(screen.queryByText('Player added to the fixture roster.')).toBeNull()
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('log_fixture_roster_added', expect.anything())
+  })
+
+  it('sends an emergency pool player as a call-up when the roster opens on them', async () => {
+    const base = mockApp.actions.call.getMockImplementation()!
+    mockApp.actions.call.mockImplementation(async (name: string, values: Record<string, unknown>) =>
+      name === 'list_fixture_team_candidates' ? { rows: [{ user_id: 'emer-1', display_name: 'Emma Emergency', pool: 'emergency' }] } : base(name, values))
+    window.history.replaceState({}, '', '/rosters')
+    render(<App />)
+    expect(await screen.findByText('Sam Player')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to roster' }))
+    await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('add_fixture_roster_player', { fixture_id: 'fixture-local', user_id: 'emer-1', selection: 'emergency_call_up' }))
+  })
+
+  it('does not show a player reply as saved when no roster row was changed', async () => {
+    authState.user = { id: 'player-1', login: 'player@example.test' }
+    mockApp.auth.user = { id: 'player-1', login: 'player@example.test' }
+    const base = mockApp.actions.call.getMockImplementation()!
+    mockApp.actions.call.mockImplementation(async (name: string, values: Record<string, unknown>) =>
+      name === 'set_my_fixture_availability' ? { changes: 0 } : base(name, values))
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /Northside.*Lakeside/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'I’m in' }))
+    expect(await screen.findByText('Your availability was not saved. You may not be on this fixture’s roster yet.')).toBeTruthy()
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('log_my_fixture_availability_change', expect.anything())
+  })
+
   it('shows actionable feedback and no management controls when the account has no managed fixtures', async () => {
     mockApp.actions.call.mockImplementation(async (name: string) => name === 'list_managed_fixtures' ? { rows: [] } : {})
     window.history.replaceState({}, '', '/rosters')

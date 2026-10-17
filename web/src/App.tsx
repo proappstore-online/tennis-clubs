@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { initPro, PageHeader, ProShell, type NavItem, useAuth } from '@proappstore/sdk'
 import ClubAdmin from './pages/ClubAdmin'
 import { fixtureArrivalLabel, fixtureStartLabel } from './fixtureTime'
@@ -7,6 +7,7 @@ import FixtureImport from './pages/FixtureImport'
 import FixtureList from './pages/FixtureList'
 import DocumentLibrary from './pages/DocumentLibrary'
 import ImportReview from './pages/ImportReview'
+import { outcomeOf } from './pages/auditTrail'
 
 const app = initPro({ appId: 'tennis-clubs' })
 const NAV: NavItem[] = [{ label: 'Comps', href: '/', title: 'Comps — Tennis Clubs' }, { label: 'Fixtures', href: '/fixtures', title: 'Upcoming fixtures — Tennis Clubs' }, { label: 'Import', href: '/fixture-import', title: 'Import fixtures — Tennis Clubs' }, { label: 'Fixture rosters', href: '/rosters', title: 'Fixture rosters — Tennis Clubs' }, { label: 'Documents', href: '/documents', title: 'Documents — Tennis Clubs' }, { label: 'Import review', href: '/import-review', title: 'Import review — Tennis Clubs' }, { label: 'Club setup', href: '/admin', title: 'Club administration — Tennis Clubs' }]
@@ -56,22 +57,24 @@ function GoogleSignIn() {
 
 function TeamInviteAcceptance({ app: inviteApp, code }: { app: typeof app; code: string }) {
   const [message, setMessage] = useState('Accepting your team invitation…')
+  // The invite is single-use and StrictMode runs effects twice in development: only the first run redeems it, and its result is always shown.
+  const startedFor = useRef('')
   useEffect(() => {
-    let active = true
+    if (startedFor.current === code) return
+    startedFor.current = code
     void (async () => {
       try {
         const invite = await inviteApp.invites.redeem(code)
         const token = typeof invite.metadata?.claimToken === 'string' ? invite.metadata.claimToken : ''
-        if (!token) { if (active) setMessage('This invite link does not include a team membership. Ask the club for a fresh link.'); return }
+        if (!token) { setMessage('This invite link does not include a team membership. Ask the club for a fresh link.'); return }
         const displayName = inviteApp.auth.user?.login ?? 'Team member'
         await inviteApp.actions.call('activate_invited_club_membership', { id: crypto.randomUUID(), claim_token: token, display_name: displayName })
         await inviteApp.actions.call('accept_team_invite', { claim_token: token, display_name: displayName })
-        if (active) setMessage('You have joined the team. Open Club setup to view your fixtures.')
+        setMessage('You have joined the team. Open Club setup to view your fixtures.')
       } catch {
-        if (active) setMessage('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')
+        setMessage('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')
       }
     })()
-    return () => { active = false }
   }, [inviteApp, code])
   return <main className="mx-auto max-w-2xl px-4 py-12"><h1 className="display-font text-3xl font-bold text-[var(--ink)]">Team invitation</h1><p className="mt-4 rounded-2xl bg-[var(--surface)] p-5 text-sm text-[var(--ink)]" role="status">{message}</p></main>
 }
@@ -106,7 +109,9 @@ function Comps({ user, onSignOut }: { user: { id: string; login: string }; onSig
     try {
       const oldAvailability = selected.my_availability ?? 'pending'
       const newAvailability = availability
-      await app.actions.call('set_my_fixture_availability', { fixture_id: selected.id, availability })
+      const result = await app.actions.call('set_my_fixture_availability', { fixture_id: selected.id, availability })
+      // No roster row was changed, so the reply is not shown as saved.
+      if (outcomeOf(result) === 'refused') { setError('Your availability was not saved. You may not be on this fixture’s roster yet.'); return }
       if (oldAvailability !== newAvailability) {
         await app.actions.call('log_my_fixture_availability_change', {
           fixture_id: selected.id,

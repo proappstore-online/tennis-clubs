@@ -75,8 +75,11 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     const targetId = String(values.id ?? values.venue_id ?? clubId)
     try {
       const result = await app.actions.call(name, values)
-      const audited = await recordAudit(app, { orgId: clubId, action: name, targetType: 'club_record', targetId, outcome: outcomeOf(result) })
-      setMessage(audited ? success : `${success} The audit record could not be written.`)
+      const outcome = outcomeOf(result)
+      const audited = await recordAudit(app, { orgId: clubId, action: name, targetType: 'club_record', targetId, outcome })
+      // A refused write changed no rows: report it as not saved rather than as success.
+      if (outcome === 'refused') setError('The change was not saved. Check the details and your club role, then try again.')
+      else setMessage(audited ? success : `${success} The audit record could not be written.`)
       await loadClubData()
     } catch (reason) {
       await recordAudit(app, { orgId: clubId, action: name, targetType: 'club_record', targetId, outcome: 'refused' })
@@ -125,7 +128,10 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     try {
       const inviteId = id()
       const result = await app.actions.call('create_team_invite', { id: inviteId, team_id: teamId, invite_token: token })
-      await recordAudit(app, { orgId: clubId, action: 'create_team_invite', targetType: 'team_invite', targetId: inviteId, outcome: outcomeOf(result) })
+      const outcome = outcomeOf(result)
+      await recordAudit(app, { orgId: clubId, action: 'create_team_invite', targetType: 'team_invite', targetId: inviteId, outcome })
+      // No pending membership was written, so an invite link for it would never be accepted.
+      if (outcome === 'refused') throw new Error('The team membership was not created.')
       // The invite carries no account role; redeeming it creates the club and team membership.
       const invite = await app.invites.create({ group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
       setInviteLink(`${window.location.origin}/join/${invite.code}`)

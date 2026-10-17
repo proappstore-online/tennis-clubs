@@ -193,6 +193,13 @@ class DocumentLibraryTests(unittest.TestCase):
                     outcome = self.db.execute("SELECT outcome FROM document_access_log WHERE id=?", (entry,)).fetchone()["outcome"]
                     self.assertEqual(outcome, "allowed" if granted else "denied")
 
+    def test_an_unstored_document_download_is_logged_as_denied(self):
+        # A registered document has no file, so the download is answered with a 404 and nothing is served; the log must not say it was allowed.
+        self.assertEqual(self.register("mgr-a", "unstored", visibility="member").rowcount, 1)
+        self.assertEqual(self.rows("check_document_access", "play-a", org_id="a", document_id="unstored"), [])
+        self.run_action("log_document_access", "play-a", id="unstored-try", org_id="a", document_id="unstored", action="download")
+        self.assertEqual(self.db.execute("SELECT outcome FROM document_access_log WHERE id='unstored-try'").fetchone()["outcome"], "denied")
+
     def test_search_category_and_paging_work_within_visibility(self):
         self.register("mgr-a", "handbook", category="behaviour", visibility="member", title="Parent behaviour handbook")
         self.run_action("mark_document_stored", "mgr-a", org_id="a", document_id="handbook", storage_key="k", content_type="application/pdf", byte_size=1, sha256=SHA)

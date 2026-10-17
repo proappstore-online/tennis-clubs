@@ -91,6 +91,10 @@ class FixtureRosterImportTests(unittest.TestCase):
             ("date,round,opponent,home_away,venue,team,season\n2026-05-02,R1,Lakeside,home,Central Courts,,2026\n", "missing team"),
             ("date,round,opponent,home_away,venue,team,season\n2026-05-02,R1,Lakeside,home,Unknown Courts,Northside,2026\n", "venue not found"),
             ("date,round,opponent,home_away,venue,team,season\n2026-05-02,R1,Nobody FC,home,Central Courts,Northside,2026\n", "opponent team not found"),
+            # Dates that do not parse at all used to throw while the preview was built, so no row was shown.
+            ("date,round,opponent,home_away,venue,team,season\n03/10/26,R1,Lakeside,home,Central Courts,Northside,2026\n", "invalid date"),
+            ("date,round,opponent,home_away,venue,team,season\n,R1,Lakeside,home,Central Courts,Northside,2026\n", "invalid date"),
+            ("date,round,opponent,home_away,venue,team,season\n31/02/2026,R1,Lakeside,home,Central Courts,Northside,2026\n", "invalid date"),
         ]
         for csv_text, expected_issue in cases:
             with self.subTest(expected_issue=expected_issue):

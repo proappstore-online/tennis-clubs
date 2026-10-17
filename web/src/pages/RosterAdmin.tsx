@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@proappstore/sdk'
 import { outcomeOf, recordAudit, type AuditOutcome } from './auditTrail'
 import { fixtureStartLabel } from '../fixtureTime'
+import { listAllRows } from './listAllRows'
 
 type AppClient = { actions: { call<T = unknown>(name: string, values: Record<string, unknown>): Promise<T> }; storage: { uploadForReview(path: string, data: Blob, contentType?: string): Promise<{ key: string }>; downloadForReview(userId: string, path: string): Promise<Response> }; auth: { user: { id: string } | null } }
 type Fixture = { id: string; org_id: string; starts_at: string; time_status: string | null; arrival_at: string | null; source_row: number | null; source_date_raw: string | null; source_time_raw: string | null; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; opponent_name: string | null; is_external_opponent: number | null; home_team_id: string; away_team_id: string; in_count: number; out_count: number; pending_count: number }
@@ -41,8 +42,9 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
   }
   async function loadFixtures() {
     try {
-      const result = await app.actions.call<{ rows: Fixture[] }>('list_managed_fixtures', {})
-      const rows = result.rows ?? []; setFixtures(rows); setFixtureId((current) => rows.some((x) => x.id === current) ? current : rows[0]?.id ?? '')
+      // Every page, so a fixture beyond the first 100 can still be rostered.
+      const rows = await listAllRows<Fixture>((offset) => app.actions.call<{ rows: Fixture[] }>('list_managed_fixtures', { limit: 100, offset }))
+      setFixtures(rows); setFixtureId((current) => rows.some((x) => x.id === current) ? current : rows[0]?.id ?? '')
       setError('')
     } catch { setError('Managed fixtures could not be loaded. Sign in with a club manager or administrator account.') }
   }
@@ -68,7 +70,11 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
         ])
         setSquad(squadResults.flatMap((result) => result.rows ?? [])); setSelectionHistory(history.rows ?? [])
       }
-      setCandidateId((current) => (c.rows ?? []).find((x) => x.user_id === current && !roster.some((p) => p.user_id === current))?.user_id ?? (c.rows ?? []).find((x) => !roster.some((p) => p.user_id === x.user_id))?.user_id ?? '')
+      // The picked candidate sets the selection default too: an emergency player can only be called up, so 'selected' would be refused.
+      const eligible = (c.rows ?? []).filter((x) => !roster.some((p) => p.user_id === x.user_id))
+      const picked = eligible.find((x) => x.user_id === candidateId) ?? eligible[0]
+      setCandidateId(picked?.user_id ?? '')
+      setSelectionState(defaultSelectionFor(picked?.pool))
     } catch { setError('This fixture roster could not be loaded.') }
   }
   useEffect(() => { void loadFixtures() }, [app])
@@ -80,6 +86,8 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
       const previousPlayer = players.find((player) => player.user_id === userId)
       const values = action === 'add_fixture_roster_player' ? { fixture_id: fixtureId, user_id: userId, selection } : { fixture_id: fixtureId, user_id: userId }
       const result = await app.actions.call(action, values)
+      // A refused write changed no rows (for example the player is not in the squad), so nothing is logged as done.
+      if (outcomeOf(result) === 'refused') throw new Error('The roster change was not applied.')
       if (action === 'add_fixture_roster_player') {
         if (!previousPlayer) await app.actions.call('log_fixture_roster_added', { fixture_id: fixtureId, user_id: userId })
         await app.actions.call('log_fixture_selection_change', { id: crypto.randomUUID(), org_id: selected?.org_id, fixture_id: fixtureId, user_id: userId, old_selection: previousPlayer?.selection ?? null })
@@ -102,10 +110,12 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await app.actions.call('set_team_player_pool', { org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, pool })
-      await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'pool_set', old_pool: member.pool, new_pool: pool })
-      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'set_team_player_pool', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome: outcomeOf(result) })
+      const outcome = outcomeOf(result)
+      if (outcome === 'succeeded') await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'pool_set', old_pool: member.pool, new_pool: pool })
+      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'set_team_player_pool', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome })
       await loadRoster()
-      setMessage(audited ? `${member.display_name} moved to the ${pool === 'emergency' ? 'emergency' : 'regular'} pool.` : 'Pool updated. The audit record could not be written.')
+      if (outcome === 'refused') setError(`${member.display_name} was not moved. Check the squad and try again.`)
+      else setMessage(audited ? `${member.display_name} moved to the ${pool === 'emergency' ? 'emergency' : 'regular'} pool.` : 'Pool updated. The audit record could not be written.')
     } catch {
       setError('The squad change could not be saved.')
     } finally { setBusy(false) }
@@ -115,10 +125,12 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await app.actions.call('deactivate_team_player', { org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id })
-      await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'deactivated', old_pool: member.pool, new_pool: null })
-      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'deactivate_team_player', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome: outcomeOf(result) })
+      const outcome = outcomeOf(result)
+      if (outcome === 'succeeded') await app.actions.call('log_team_pool_change', { id: crypto.randomUUID(), org_id: selected.org_id, team_id: member.team_id, user_id: member.user_id, display_name: member.display_name, action: 'deactivated', old_pool: member.pool, new_pool: null })
+      const audited = await recordAudit(app, { orgId: selected.org_id, action: 'deactivate_team_player', targetType: 'team_player', targetId: `${member.team_id}:${member.user_id}`, outcome })
       await loadRoster()
-      setMessage(audited ? `${member.display_name} has left the active squad.` : 'Squad updated. The audit record could not be written.')
+      if (outcome === 'refused') setError(`${member.display_name} was not removed from the squad. Check the squad and try again.`)
+      else setMessage(audited ? `${member.display_name} has left the active squad.` : 'Squad updated. The audit record could not be written.')
     } catch {
       setError('The squad change could not be saved.')
     } finally { setBusy(false) }
@@ -130,9 +142,11 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await app.actions.call('update_fixture_match_day', { fixture_id: fixtureId, status: String(form.get('status')), match_notice: String(form.get('match_notice') ?? '') })
-      const audited = await audit('update_fixture_match_day', 'fixture', fixtureId, outcomeOf(result))
+      const outcome = outcomeOf(result)
+      const audited = await audit('update_fixture_match_day', 'fixture', fixtureId, outcome)
       await loadFixtures()
-      setMessage(audited ? 'Match-day status and notice published.' : 'Match-day status and notice published. The audit record could not be written.')
+      if (outcome === 'refused') setError('The match-day update was not published. Check your club role and try again.')
+      else setMessage(audited ? 'Match-day status and notice published.' : 'Match-day status and notice published. The audit record could not be written.')
     } catch {
       await audit('update_fixture_match_day', 'fixture', fixtureId, 'refused')
       setError('The match-day update could not be saved.')
@@ -144,6 +158,8 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     const form = new FormData(event.currentTarget); const file = form.get('scorecard') as File | null
     setBusy(true); setError(''); setMessage('')
     try {
+      const sets = String(form.get('set_results') ?? '').trim()
+      if (sets) JSON.parse(sets)
       let scorecardPath: string | null = null; let scorecardUserId: string | null = null
       if (file?.size) {
         if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type) || file.size > 10 * 1024 * 1024) throw new Error('Choose a PDF or image up to 10 MB.')
@@ -151,14 +167,17 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
         scorecardPath = `fixture-cards/${fixtureId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
         await app.storage.uploadForReview(scorecardPath, file, file.type); scorecardUserId = app.auth.user.id
       }
-      const sets = String(form.get('set_results') ?? '').trim()
-      if (sets) JSON.parse(sets)
       const submissionId = crypto.randomUUID()
       const submitted = await app.actions.call('submit_fixture_result', { id: submissionId, fixture_id: fixtureId, home_score: Number(form.get('home_score')), away_score: Number(form.get('away_score')), set_results: sets, scorecard_user_id: scorecardUserId, scorecard_path: scorecardPath, correction_note: String(form.get('correction_note') ?? '') })
-      await audit('submit_fixture_result', 'fixture_result', submissionId, outcomeOf(submitted))
+      const submittedOutcome = outcomeOf(submitted)
+      await audit('submit_fixture_result', 'fixture_result', submissionId, submittedOutcome)
+      if (submittedOutcome === 'refused') throw new Error('The result was not saved. Check your club role and the scores, then try again.')
       const applied = await app.actions.call('apply_fixture_result_to_fixture', { submission_id: submissionId, fixture_id: fixtureId })
-      await audit('apply_fixture_result_to_fixture', 'fixture', fixtureId, outcomeOf(applied))
-      await loadRoster(); await loadFixtures(); setMessage('Result submission saved. Earlier submissions remain in the history.')
+      const appliedOutcome = outcomeOf(applied)
+      await audit('apply_fixture_result_to_fixture', 'fixture', fixtureId, appliedOutcome)
+      await loadRoster(); await loadFixtures()
+      if (appliedOutcome === 'refused') throw new Error('The result was recorded in the history, but the fixture score was not updated. Try again.')
+      setMessage('Result submission saved. Earlier submissions remain in the history.')
     } catch (e) { setError(e instanceof Error ? e.message : 'The result could not be saved.') }
     finally { setBusy(false) }
   }

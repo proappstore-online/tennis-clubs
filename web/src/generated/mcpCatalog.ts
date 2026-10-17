@@ -3427,7 +3427,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   },
   {
     "name": "log_document_access",
-    "description": "Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the document, so callers cannot choose the outcome",
+    "description": "Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the stored document, so callers cannot choose the outcome",
     "operation": "execute",
     "roles": [
       "admin",

@@ -183,6 +183,18 @@ describe('manager upload', () => {
     expect(app.worker.fetch).toHaveBeenCalledWith(expect.stringMatching(/^\/documents\/[0-9a-f-]+\/upload\?org=a$/), expect.objectContaining({ method: 'POST', headers: { 'Content-Type': 'application/pdf' } }))
   })
 
+  it('does not register a document a second time when its file upload fails', async () => {
+    const app = appWith({ ...managerClubs, register_document: { changes: 1 } }) as unknown as { actions: { call: ReturnType<typeof vi.fn> }; worker: { fetch: ReturnType<typeof vi.fn> } }
+    app.worker.fetch.mockRejectedValue(new Error('offline'))
+    render(<DocumentLibrary app={app as never} />)
+    await screen.findByLabelText('Document title')
+    fillForm(file)
+    fireEvent.click(screen.getByRole('button', { name: 'Add document' }))
+    expect(await screen.findByText('The document was added, but its file was not uploaded. Use Upload file on the document to finish.')).toBeTruthy()
+    expect(app.actions.call.mock.calls.filter((call) => call[0] === 'register_document')).toHaveLength(1)
+    expect((screen.getByLabelText('Document title') as HTMLInputElement).value).toBe('')
+  })
+
   it('refuses an unsupported file type before anything is registered', async () => {
     const app = appWith(managerClubs) as unknown as { actions: { call: ReturnType<typeof vi.fn> } }
     render(<DocumentLibrary app={app as never} />)

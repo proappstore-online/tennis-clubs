@@ -1644,7 +1644,7 @@ Returns: `id`, `title`, `content_type`, `byte_size`, `sha256`
 
 ### `log_document_access`
 
-Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the document, so callers cannot choose the outcome
+Append a document view or download attempt to the access log with the caller as actor; the server records allowed only when the caller can see the stored document, so callers cannot choose the outcome
 
 - Access: member; roles: admin, convenor, manager; audience: member.
 - Idempotency: append-only. Audit: not required.
