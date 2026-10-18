@@ -23,6 +23,12 @@ describe('member fixtures', () => {
     expect(screen.getByText('Your team: Northside')).toBeTruthy()
   })
 
+  it('shows the overall score for a completed fixture and no score for an open one', async () => {
+    render(<FixtureList app={appReturning({ rows: [fixture({ id: 'done', status: 'complete', home_score: 3, away_score: 5, home_team_name: 'Blackburn', away_team_name: 'Hawthorn' }), fixture({ id: 'open', status: 'scheduled', home_score: null, away_score: null, home_team_name: 'Northside', away_team_name: 'Lakeside' })] })} />)
+    expect(await screen.findByText('Result: Blackburn 3 – 5 Hawthorn')).toBeTruthy()
+    expect(screen.getAllByText(/^Result:/)).toHaveLength(1)
+  })
+
   it('uses the start of today so a scheduled morning fixture remains visible later in the day', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 9, 18, 16, 48))

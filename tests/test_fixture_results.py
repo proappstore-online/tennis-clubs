@@ -42,6 +42,21 @@ class FixtureResultTests(unittest.TestCase):
         self.assertEqual(history[0]["correction_note"], "Corrected after card review")
         self.assertEqual(history[1]["home_score"], 3)
 
+    def test_member_fixture_list_shows_completed_scores_for_recent_results_only(self):
+        self.db.execute("INSERT INTO team_memberships(id,org_id,team_id,user_id,created_by,accepted_at,created_at) VALUES('m','club','home','player','manager',1,1)")
+        self.db.executemany("INSERT INTO fixtures(id,org_id,home_team_id,away_team_id,starts_at,status,created_at) VALUES(?,?,?,?,?,?,1)", [
+            ("next", "club", "home", "away", "2026-10-25T09:00:00+11:00", "scheduled"),
+            ("stale", "club", "home", "away", "2026-09-10T09:00:00+10:00", "complete"),
+            ("open-past", "club", "home", "away", "2026-10-12T09:00:00+11:00", "scheduled")])
+        self.db.execute("UPDATE fixtures SET home_score=3,away_score=5,status='complete' WHERE id='f'")
+        self.db.execute("UPDATE fixtures SET home_score=1,away_score=0,status='complete' WHERE id='stale'")
+        rows = self.db.execute(TOOLS["list_my_fixtures"]["sql"], {"__user_id": "player", "from": "2026-10-18T00:00:00+11:00", "limit": 50}).fetchall()
+        self.assertEqual([row["id"] for row in rows], ["next", "f"])
+        self.assertEqual((rows[1]["home_score"], rows[1]["away_score"], rows[1]["status"]), (3, 5, "complete"))
+        self.assertIsNone(rows[0]["home_score"])
+        self.assertNotIn("scorecard_path", rows[1].keys())
+        self.assertNotIn("set_results", rows[1].keys())
+
     def test_non_manager_cannot_submit_or_read_results(self):
         self.submit("denied", user="player")
         self.assertEqual(self.db.execute("SELECT COUNT(*) FROM fixture_result_submissions").fetchone()[0], 0)
