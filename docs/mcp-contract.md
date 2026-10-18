@@ -184,7 +184,7 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 
 ### `list_my_fixtures`
 
-List upcoming fixtures for teams the authenticated caller has joined
+List fixtures for teams the authenticated caller has joined; mode selects upcoming (default), past (before from, newest first) or all, with optional date, season, team and result-status filters
 
 - Access: team-member; roles: none (see access); audience: player.
 - Idempotency: read-only. Audit: not required.
@@ -195,8 +195,14 @@ List upcoming fixtures for teams the authenticated caller has joined
 | `from` | string |
 | `limit` | integer; default 20; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
+| `mode` | string; default "upcoming"; one of `upcoming`, `past`, `all` |
+| `date_from` | string; default ""; maxLength 40 |
+| `to` | string; default ""; maxLength 40 |
+| `season_id` | string; default ""; maxLength 64 |
+| `team_id` | string; default ""; maxLength 64 |
+| `result_status` | string; default ""; maxLength 20 |
 
-Returns: `id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `round_label`, `status`, `home_score`, `away_score`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
+Returns: `id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `round_label`, `status`, `home_score`, `away_score`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `season_id`, `season_name`, `home_team_id`, `away_team_id`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
 
 ### `list_fixture_roster`
 
