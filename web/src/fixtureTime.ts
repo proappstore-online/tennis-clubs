@@ -13,3 +13,7 @@ export function fixtureStartLabel(fixture: TimedFixture): string {
 export function fixtureArrivalLabel(fixture: TimedFixture): string | null {
   return fixture.arrival_at ? `Arrival / check-in ${clock(fixture.arrival_at)}` : null
 }
+
+export function fixtureListStart(now = new Date()): string {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+}

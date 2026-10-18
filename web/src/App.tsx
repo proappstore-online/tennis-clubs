@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { initPro, PageHeader, ProShell, type NavItem, useAuth } from '@proappstore/sdk'
 import ClubAdmin from './pages/ClubAdmin'
-import { fixtureArrivalLabel, fixtureStartLabel } from './fixtureTime'
+import { fixtureArrivalLabel, fixtureListStart, fixtureStartLabel } from './fixtureTime'
 import RosterAdmin from './pages/RosterAdmin'
 import FixtureImport from './pages/FixtureImport'
 import FixtureList from './pages/FixtureList'
@@ -91,7 +91,7 @@ function Comps({ user, onSignOut }: { user: { id: string; login: string }; onSig
     if (!user) return
     setLoading(true); setError(null)
     try {
-      const result = await app.actions.call<{ rows: Fixture[] }>('list_my_fixtures', { from: new Date().toISOString(), limit: 24 })
+      const result = await app.actions.call<{ rows: Fixture[] }>('list_my_fixtures', { from: fixtureListStart(), limit: 24 })
       setFixtures(result.rows ?? [])
     } catch { setError('Your fixture list could not be loaded. Please try again.') }
     finally { setLoading(false) }

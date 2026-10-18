@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import FixtureList from '../src/pages/FixtureList'
 import { fixturesLoadMessage } from '../src/pages/fixtureListMessages'
+import { fixtureListStart } from '../src/fixtureTime'
 
 afterEach(cleanup)
 
@@ -20,6 +21,13 @@ describe('member fixtures', () => {
     render(<FixtureList app={appReturning({ rows: [fixture()] })} />)
     expect(await screen.findByRole('heading', { name: 'Northside vs Lakeside' })).toBeTruthy()
     expect(screen.getByText('Your team: Northside')).toBeTruthy()
+  })
+
+  it('uses the start of today so a scheduled morning fixture remains visible later in the day', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 9, 18, 16, 48))
+    expect(fixtureListStart()).toBe(new Date(2026, 9, 18).toISOString())
+    vi.useRealTimers()
   })
 
   it('labels the member team and the opponent separately, marking an external club', async () => {
