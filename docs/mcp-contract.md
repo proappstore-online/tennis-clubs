@@ -196,7 +196,7 @@ List upcoming fixtures for teams the authenticated caller has joined
 | `limit` | integer; default 20; min 1; max 100 |
 | `offset` | integer; default 0; min 0 |
 
-Returns: `id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `round_label`, `status`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
+Returns: `id`, `updated_at`, `starts_at`, `time_status`, `arrival_at`, `round_label`, `status`, `home_score`, `away_score`, `status_updated_at`, `match_notice`, `home_team_name`, `away_team_name`, `member_side`, `opponent_name`, `is_external_opponent`, `division_name`, `venue_name`, `venue_address`, `map_url`, `venue_notes`, `my_availability`
 
 ### `list_fixture_roster`
 

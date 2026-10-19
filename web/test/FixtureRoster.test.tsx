@@ -77,6 +77,14 @@ describe('fixture roster flows with isolated local fixtures', () => {
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('log_fixture_roster_added', { fixture_id: 'fixture-local', user_id: 'player-2' }))
   })
 
+  it('links the selected fixture to a clearly named result entry section for the manager', async () => {
+    window.history.replaceState({}, '', '/rosters')
+    render(<App />)
+    const link = await screen.findByRole('link', { name: 'Enter or correct the result for this fixture' })
+    expect(link.getAttribute('href')).toBe('#fixture-result')
+    expect(screen.getByRole('heading', { name: 'Enter or correct the result' })).toBeTruthy()
+  })
+
   it('labels the member team and an external opponent on the player card', async () => {
     authState.user = { id: 'player-1', login: 'player@example.test' }
     mockApp.auth.user = { id: 'player-1', login: 'player@example.test' }
