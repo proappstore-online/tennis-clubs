@@ -63,7 +63,7 @@ Application logs must never carry P1 to P4 values. Log opaque record identifiers
 
 - Venue addresses and map links are P0 public access details. Opening a map link sends the venue address, not the user's location.
 - The user's own location is personal data and is never requested without consent. See `web/src/location/consent.ts`. Consent is recorded per user in the SDK's per-user store (`app.kv`), can be withdrawn, and gates every location request. No location is stored server-side.
-- A future feature that needs the user's location must call that module, and must not store a location without a new decision recorded here.
+- A guard test (`web/test/LocationConsent.test.ts`) fails if any other source file mentions `geolocation`. A future feature that needs the user's location must call that module, and must not store a location without a new decision recorded here.
 
 ## Open items
 
