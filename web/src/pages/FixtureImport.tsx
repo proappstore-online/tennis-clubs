@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { outcomeOf, recordAudit } from './auditTrail'
+import { emit } from '../telemetry/events'
+import { importAnomalyEvents, importCompletedEvent } from '../telemetry/domain'
 import { issueRecords, mapFixtureRows, normalizeDate, parseCsv, upsertFixtureArgs, type FixtureOption, type FixtureRow, type ValidationIssue } from './fixtureImportLogic'
 
 type Option = FixtureOption
@@ -87,6 +89,7 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
 
   async function recordImport(orgId: string | undefined, kind: 'fixtures' | 'roster', received: number, saved: number, status: 'saved' | 'rejected', id: string, counts: { blocking: number; warnings: number; acknowledged: number }): Promise<boolean> {
     if (!orgId || received === 0) return true
+    emit(app.logs, importCompletedEvent({ kind, received, saved, status, blocking: counts.blocking, warnings: counts.warnings }))
     try {
       await app.actions.call('record_import_run', { id, org_id: orgId, kind, received_count: received, saved_count: saved, rejected_count: received - saved, status, source_sha256: fileDigest || null, blocking_count: counts.blocking, warning_count: counts.warnings, acknowledged_count: counts.acknowledged })
     } catch { return false }
@@ -96,6 +99,7 @@ export default function FixtureImport({ app }: { app: ProAppStore }) {
   // Stores every issue the check reported on the run, so the import report can show each row's problems. Needs the run row, so it runs after the run is recorded.
   async function recordIssues(orgId: string | undefined, id: string): Promise<boolean> {
     if (!orgId || !issues || fixtures.length === 0) return true
+    for (const event of importAnomalyEvents('fixtures', issues)) emit(app.logs, event)
     try {
       await app.actions.call('record_import_run_issues', { org_id: orgId, import_run_id: id, issues: JSON.stringify(issueRecords(issues)) })
       return true
