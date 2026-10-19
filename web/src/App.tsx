@@ -10,6 +10,7 @@ import DocumentLibrary from './pages/DocumentLibrary'
 import ImportReview from './pages/ImportReview'
 import { outcomeOf } from './pages/auditTrail'
 import { applyPageMeta, SIGN_IN_META, signedInMeta, signedInTitle } from './seo'
+import { reportPageLoad, reportPageView, routeName } from './telemetry/pages'
 
 const app = initPro({ appId: 'tennis-clubs' })
 export const NAV: NavItem[] = [{ label: 'Comps', href: '/', title: 'Comps — Tennis Clubs' }, { label: 'Fixtures', href: '/fixtures', title: 'Upcoming fixtures — Tennis Clubs' }, { label: 'Import', href: '/fixture-import', title: 'Import fixtures — Tennis Clubs' }, { label: 'Fixture rosters', href: '/rosters', title: 'Fixture rosters — Tennis Clubs' }, { label: 'Documents', href: '/documents', title: 'Documents — Tennis Clubs' }, { label: 'Import review', href: '/import-review', title: 'Import review — Tennis Clubs' }, { label: 'Club setup', href: '/admin', title: 'Club administration — Tennis Clubs' }]
@@ -32,6 +33,9 @@ export default function App() {
 
 function AuthenticatedApp({ user, signOut }: { user: { id: string; login: string }; signOut: () => void }) {
   const path = window.location.pathname
+  const renderStartedAt = performance.now()
+  // Page telemetry: load timing once per document, and how long each screen took to render (see telemetry/pages.ts).
+  useEffect(() => { reportPageLoad(app.logs, routeName(path, NAV)); reportPageView(app.logs, routeName(path, NAV), renderStartedAt) }, [path])
   // Signed-in views are excluded from search and point their canonical link at the site root (see seo.ts).
   useEffect(() => applyPageMeta(signedInMeta(signedInTitle(path, NAV))), [path])
   const page = path === '/admin' ? <ClubAdmin app={app} /> : path === '/fixture-import' ? <FixtureImport app={app} /> : path === '/fixtures' ? <FixtureList app={app} /> : path === '/rosters' ? <RosterAdmin app={app} /> : path === '/documents' ? <DocumentLibrary app={app} /> : path === '/import-review' ? <ImportReview app={app} /> : path.startsWith('/join/') ? <TeamInviteAcceptance app={app} code={decodeURIComponent(path.slice('/join/'.length))} /> : <Comps user={user} onSignOut={signOut} />
@@ -59,6 +63,7 @@ function AuthenticatedApp({ user, signOut }: { user: { id: string; login: string
 
 function GoogleSignIn() {
   useEffect(() => { document.title = SIGN_IN_META.title; applyPageMeta(SIGN_IN_META) }, [])
+  useEffect(() => { reportPageLoad(app.logs, 'sign_in') }, [])
   return <main className="mx-auto max-w-xl px-4 py-16"><section className="rounded-3xl border border-[var(--line)] bg-[var(--surface)] p-7 text-center shadow-sm sm:p-10"><span className="text-4xl" aria-hidden>🎾</span><h1 className="display-font mt-4 text-3xl font-bold text-[var(--ink)]">Your club, in your pocket</h1><p className="mt-3 text-sm leading-6 text-[var(--muted)]">Sign in with your Google account to see your team fixtures, roster and match-day details.</p><button onClick={() => app.auth.signIn('google')} className="mt-6 min-h-11 w-full rounded-xl bg-[var(--accent)] px-5 font-semibold text-white">Continue with Google</button></section></main>
 }
 
