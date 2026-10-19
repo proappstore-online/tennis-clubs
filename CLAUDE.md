@@ -127,3 +127,12 @@ const { user, loading, signIn, signOut } = useProAuth(app)
 - Public identifiers: set as GitHub repo Variables (`VITE_*` prefix).
 - API keys that cost money: use `app.proxy.fetch()`.
 - Local dev: use `.env.local` (gitignored).
+
+## CI workflows
+
+Every workflow job must go through the router job (see `.github/workflows/*.yml` for the pattern).
+Never hard-code `ubuntu-latest` or any other runner label directly on a job — always use
+`runs-on: ${{ fromJSON(needs.router.outputs.runner) }}` and declare `needs: router`. The router
+(`serge-ivo/runner-router/.github/workflows/router.yml@v1`) checks the org's Actions minutes and
+fails over to the self-hosted `pags` runners when they run out, so a hard-coded hosted label is a
+job that stops running the day the minutes do.
