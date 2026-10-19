@@ -1,4 +1,4 @@
-// Structured telemetry (issue #36). Events go to the platform log sink (`app.logs`), which accepts anonymous reports.
+// Structured telemetry (issue #36). Events go to the app log sink (`app.logs`), which accepts anonymous reports.
 // Every event is built from a closed schema: each event name lists the only fields it may carry, and each field has a
 // fixed type. Free text, e-mail addresses, names and identifiers cannot be expressed in this schema, so they cannot reach
 // the log. An event that fails its schema is dropped rather than sent in part. See docs/telemetry.md.
