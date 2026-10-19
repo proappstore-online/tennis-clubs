@@ -17,3 +17,9 @@ export function fixtureArrivalLabel(fixture: TimedFixture): string | null {
 export function fixtureListStart(now = new Date()): string {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
 }
+
+// Start of a calendar day (YYYY-MM-DD, as a date input gives it) in the viewer's local time, as an ISO instant.
+export function localDayStart(day: string, offsetDays = 0): string {
+  const [year, month, date] = day.split('-').map(Number)
+  return new Date(year, month - 1, date + offsetDays).toISOString()
+}

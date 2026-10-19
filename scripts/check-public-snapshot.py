@@ -63,7 +63,8 @@ def main() -> int:
             errors.append("a common credential pattern was found in tracked content")
             break
 
-    commit_ids = git("log", "--all", "--format=%H").splitlines()
+    # Merge commits are skipped: on pull_request runs CI checks out GitHub's own merge commit, whose author is not the owner. Its tree is the PR head's tree, which is still checked.
+    commit_ids = git("log", "--all", "--no-merges", "--format=%H").splitlines()
     for commit_id in commit_ids:
         tree_paths = committed_paths(commit_id)
         for path in tree_paths:

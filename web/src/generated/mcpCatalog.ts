@@ -25,7 +25,7 @@ export interface McpCatalogEntry {
 export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     "name": "list_my_fixtures",
-    "description": "List upcoming fixtures for teams the authenticated caller has joined",
+    "description": "List fixtures for teams the authenticated caller has joined; mode selects upcoming (default), past (before from, newest first) or all, with optional date, season, team and result-status filters",
     "operation": "query",
     "roles": [],
     "access": "team-member",
@@ -51,6 +51,41 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
         "type": "integer",
         "default": 0,
         "min": 0
+      },
+      {
+        "name": "mode",
+        "type": "string",
+        "default": "upcoming",
+        "enum": [
+          "upcoming",
+          "past",
+          "all"
+        ]
+      },
+      {
+        "name": "date_from",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "to",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "season_id",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "team_id",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "result_status",
+        "type": "string",
+        "default": ""
       }
     ]
   },
