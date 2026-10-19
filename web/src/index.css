@@ -78,12 +78,19 @@
   /* surface: used by the page components but previously never defined */
   --surface: #ffffff;
 
+  /* text on accent fills (buttons, selected tabs); white on the dark-theme accent is unreadable */
+  --on-accent: #ffffff;
+  /* error text on a danger tint; --danger itself is below 4.5:1 on that tint in light mode */
+  --danger-ink: #9b3a31;
+
   /* breakpoints as custom media (informational; real breakpoints use min-width in @media) */
   /* bp-sm=640px  bp-md=768px  bp-lg=1024px  bp-xl=1280px */
 }
 
 :root[data-theme='dark'] {
   --surface: #1e2128;
+  --on-accent: #000000;
+  --danger-ink: #ff7a72;
 
   color-scheme: dark;
   --paper: #000000;
