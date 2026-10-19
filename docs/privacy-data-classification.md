@@ -57,6 +57,7 @@ Deletion must go through the server, under the same role gates as the write it r
 Application logs must never carry P1 to P4 values. Log opaque record identifiers only (for example an organisation, team, venue or fixture UUID), and an action name. Identifiers that link to a person (`user_id`, actor and creator IDs, scorecard IDs) are personal and are not logged either. The record of who did what belongs in the audit tables (P3), not in logs.
 
 - The web app writes logs through `web/src/privacy/redact.ts` (`safeLog`), which removes personal-data keys and values before anything is printed. A guard test (`web/test/SafeLogging.test.ts`) fails if any file in `web/src` or `worker/src` calls `console` directly instead of going through `safeLog`.
+- Structured telemetry (imports, score submission, refused writes, page timing) goes through the schema in `web/src/telemetry/`, which accepts counts, durations and tokens only. See `docs/telemetry.md`.
 - Platform logs (the PAS runtime, Cloudflare) are outside this repo. The app must not send personal data to them.
 
 ## Location
