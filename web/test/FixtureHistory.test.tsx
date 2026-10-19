@@ -50,7 +50,8 @@ describe('fixtures history', () => {
     render(<FixtureList app={app} />)
     await screen.findByRole('heading', { name: 'Northside vs Lakeside' })
     const team = screen.getByRole('combobox', { name: 'Team' })
-    expect(within(team).getByRole('option', { name: 'Northside' })).toBeTruthy()
+    // Team options are filled in after the fixtures render, so wait for them rather than assume they are already there.
+    expect(await within(team).findByRole('option', { name: 'Northside' })).toBeTruthy()
     fireEvent.change(team, { target: { value: 'home' } })
     await waitFor(() => expect(call).toHaveBeenLastCalledWith('list_my_fixtures', expect.objectContaining({ team_id: 'home' })))
   })
