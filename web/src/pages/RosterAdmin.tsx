@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { PageHeader } from '@proappstore/sdk'
 import { outcomeOf, recordAudit, type AuditOutcome } from './auditTrail'
+import { emit, type LogSink } from '../telemetry/events'
+import { scoreSubmittedEvent } from '../telemetry/domain'
 import { fixtureStartLabel } from '../fixtureTime'
 import { listAllRows } from './listAllRows'
 
-type AppClient = { actions: { call<T = unknown>(name: string, values: Record<string, unknown>): Promise<T> }; storage: { uploadForReview(path: string, data: Blob, contentType?: string): Promise<{ key: string }>; downloadForReview(userId: string, path: string): Promise<Response> }; auth: { user: { id: string } | null } }
+type AppClient = { actions: { call<T = unknown>(name: string, values: Record<string, unknown>): Promise<T> }; storage: { uploadForReview(path: string, data: Blob, contentType?: string): Promise<{ key: string }>; downloadForReview(userId: string, path: string): Promise<Response> }; auth: { user: { id: string } | null }; logs?: LogSink }
 type Fixture = { id: string; org_id: string; starts_at: string; time_status: string | null; arrival_at: string | null; source_row: number | null; source_date_raw: string | null; source_time_raw: string | null; round_label: string | null; status: string; status_updated_at: number | null; match_notice: string | null; home_score: number | null; away_score: number | null; home_team_name: string; away_team_name: string; opponent_name: string | null; is_external_opponent: number | null; home_team_id: string; away_team_id: string; in_count: number; out_count: number; pending_count: number }
 type Selection = 'selected' | 'pending' | 'unavailable' | 'emergency_call_up'
 type Player = { user_id: string; display_name: string; availability: 'in' | 'out' | 'pending'; selection: Selection | null; pool: 'regular' | 'emergency' | null; updated_at: number | null }
@@ -157,6 +159,9 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
     event.preventDefault(); if (!fixtureId) return
     const form = new FormData(event.currentTarget); const file = form.get('scorecard') as File | null
     setBusy(true); setError(''); setMessage('')
+    // Outcomes of the two server writes, reported once when the save ends (issue #36).
+    let submittedAs: AuditOutcome | null = null
+    let appliedAs: AuditOutcome | null = null
     try {
       const sets = String(form.get('set_results') ?? '').trim()
       if (sets) JSON.parse(sets)
@@ -170,16 +175,18 @@ export default function RosterAdmin({ app }: { app: AppClient }) {
       const submissionId = crypto.randomUUID()
       const submitted = await app.actions.call('submit_fixture_result', { id: submissionId, fixture_id: fixtureId, home_score: Number(form.get('home_score')), away_score: Number(form.get('away_score')), set_results: sets, scorecard_user_id: scorecardUserId, scorecard_path: scorecardPath, correction_note: String(form.get('correction_note') ?? '') })
       const submittedOutcome = outcomeOf(submitted)
+      submittedAs = submittedOutcome
       await audit('submit_fixture_result', 'fixture_result', submissionId, submittedOutcome)
       if (submittedOutcome === 'refused') throw new Error('The result was not saved. Check your club role and the scores, then try again.')
       const applied = await app.actions.call('apply_fixture_result_to_fixture', { submission_id: submissionId, fixture_id: fixtureId })
       const appliedOutcome = outcomeOf(applied)
+      appliedAs = appliedOutcome
       await audit('apply_fixture_result_to_fixture', 'fixture', fixtureId, appliedOutcome)
       await loadRoster(); await loadFixtures()
       if (appliedOutcome === 'refused') throw new Error('The result was recorded in the history, but the fixture score was not updated. Try again.')
       setMessage('Result submission saved. Earlier submissions remain in the history.')
     } catch (e) { setError(e instanceof Error ? e.message : 'The result could not be saved.') }
-    finally { setBusy(false) }
+    finally { setBusy(false); if (submittedAs) emit(app.logs, scoreSubmittedEvent(submittedAs, appliedAs)) }
   }
   async function downloadCard(userId: string, path: string) {
     try {
