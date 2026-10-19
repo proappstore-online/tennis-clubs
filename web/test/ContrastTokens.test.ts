@@ -72,3 +72,14 @@ describe('contrast of rendered token pairs (WCAG AA, 4.5:1 for body text)', () =
     })
   }
 })
+
+// WCAG 2.1 SC 1.4.11: a visible focus indicator needs 3:1 against the colours it sits on.
+describe('focus indicator contrast (non-text, 3:1)', () => {
+  for (const [theme, tokensForTheme] of [['light', light], ['dark', dark]] as const) {
+    it(`${theme} theme: the focus ring meets 3:1 on the page and card surfaces`, () => {
+      for (const background of ['paper', 'surface', 'paper-deep']) {
+        expect(contrast(tokensForTheme['sky-deep'], tokensForTheme[background])).toBeGreaterThanOrEqual(3)
+      }
+    })
+  }
+})

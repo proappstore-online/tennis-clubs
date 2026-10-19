@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
 import type { ProAppStore } from '@proappstore/sdk'
 import { fixtureArrivalLabel, fixtureListStart, fixtureStartLabel, localDayStart } from '../fixtureTime'
 import { fixturesLoadMessage } from './fixtureListMessages'
@@ -70,9 +70,19 @@ export default function FixtureList({ app }: { app: ProAppStore }) {
 
   const emptyMessage = filtersApplied ? 'No fixtures match these filters.' : mode === 'past' ? 'No past fixtures are available for your teams.' : mode === 'all' ? 'No fixtures are available for your teams.' : 'No upcoming fixtures are available for your teams.'
 
+  // ARIA tabs pattern: arrow keys, Home and End move between periods and focus the new tab.
+  function onTabKey(event: KeyboardEvent<HTMLDivElement>) {
+    const index = MODES.findIndex(([value]) => value === mode)
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? MODES.length - 1 : event.key === 'ArrowRight' ? (index + 1) % MODES.length : event.key === 'ArrowLeft' ? (index - 1 + MODES.length) % MODES.length : -1
+    if (next < 0) return
+    event.preventDefault()
+    setMode(MODES[next][0])
+    document.getElementById(`fixtures-tab-${MODES[next][0]}`)?.focus()
+  }
+
   return <main className="container-app py-8"><h1 className="display-font text-3xl font-bold text-[var(--ink)]">Fixtures</h1><p className="mt-2 text-sm text-[var(--muted)]">Fixtures for teams you belong to. Player and contact records are not shown here.</p>
 
-    <div role="tablist" aria-label="Fixture period" className="mt-5 inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1">
+    <div role="tablist" aria-label="Fixture period" onKeyDown={onTabKey} className="mt-5 inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1">
       {MODES.map(([value, label]) => <button key={value} role="tab" id={`fixtures-tab-${value}`} aria-selected={mode === value} aria-controls="fixtures-panel" tabIndex={mode === value ? 0 : -1} onClick={() => setMode(value)} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${mode === value ? 'bg-[var(--accent)] text-[var(--on-accent)]' : 'text-[var(--ink)] hover:bg-[var(--paper-deep)]'}`}>{label}</button>)}
     </div>
 
@@ -86,8 +96,8 @@ export default function FixtureList({ app }: { app: ProAppStore }) {
     </form>
 
     <div id="fixtures-panel" role="tabpanel" aria-labelledby={`fixtures-tab-${mode}`}>
-    {error && <p className="mt-5 rounded-xl bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger-ink)]">{error}</p>}
-    {loading ? <p className="mt-5 text-sm text-[var(--muted)]" role="status">Loading fixtures…</p> : error ? null : fixtures.length === 0 ? <p className="mt-5 rounded-2xl border border-dashed border-[var(--line-strong)] p-8 text-center text-sm text-[var(--muted)]">{emptyMessage}</p> : <div className="mt-5 grid gap-3">{fixtures.map((fixture) => <article key={fixture.id} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm"><div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-bold text-[var(--ink)]">{fixture.home_team_name} <span className="font-medium text-[var(--muted)]">vs</span> {fixture.away_team_name}</h2><span className="text-xs font-semibold text-[var(--accent)]">{fixture.round_label ?? 'Fixture'}</span></div><p className="mt-2 text-sm text-[var(--muted)]">{fixtureStartLabel(fixture)}{fixtureArrivalLabel(fixture) ? ` · ${fixtureArrivalLabel(fixture)}` : ''} · {fixture.venue_name ?? 'Venue to be confirmed'}{fixture.venue_address ? ` · ${fixture.venue_address}` : ''}</p><p className="mt-1 text-xs text-[var(--muted)]">{fixture.home_team_name} is home</p>{completedScoreLabel(fixture) && <p className="mt-2 text-sm font-bold text-[var(--ink)]">Result: {completedScoreLabel(fixture)}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--accent-deep)]">Your team: {fixture.member_side === 'home' ? fixture.home_team_name : fixture.away_team_name}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Opponent: {fixture.opponent_name ?? fixture.away_team_name}{fixture.is_external_opponent ? ' (external club)' : ''}</p>}</article>)}</div>}
+    {error && <p role="alert" className="mt-5 rounded-xl bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger-ink)]">{error}</p>}
+    {loading ? <p className="mt-5 text-sm text-[var(--muted)]" role="status">Loading fixtures…</p> : error ? null : fixtures.length === 0 ? <p className="mt-5 rounded-2xl border border-dashed border-[var(--line-strong)] p-8 text-center text-sm text-[var(--muted)]">{emptyMessage}</p> : <ul className="mt-5 grid list-none gap-3">{fixtures.map((fixture) => <li key={fixture.id}><article className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm"><div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-bold text-[var(--ink)]">{fixture.home_team_name} <span className="font-medium text-[var(--muted)]">vs</span> {fixture.away_team_name}</h2><span className="text-xs font-semibold text-[var(--accent)]">{fixture.round_label ?? 'Fixture'}</span></div><p className="mt-2 text-sm text-[var(--muted)]">{fixtureStartLabel(fixture)}{fixtureArrivalLabel(fixture) ? ` · ${fixtureArrivalLabel(fixture)}` : ''} · {fixture.venue_name ?? 'Venue to be confirmed'}{fixture.venue_address ? ` · ${fixture.venue_address}` : ''}</p><p className="mt-1 text-xs text-[var(--muted)]">{fixture.home_team_name} is home</p>{completedScoreLabel(fixture) && <p className="mt-2 text-sm font-bold text-[var(--ink)]">Result: {completedScoreLabel(fixture)}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--accent-deep)]">Your team: {fixture.member_side === 'home' ? fixture.home_team_name : fixture.away_team_name}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Opponent: {fixture.opponent_name ?? fixture.away_team_name}{fixture.is_external_opponent ? ' (external club)' : ''}</p>}</article></li>)}</ul>}
     </div>
   </main>
 }
