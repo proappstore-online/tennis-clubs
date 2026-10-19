@@ -42,3 +42,8 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Vitest (rendered UI regression)
         run: pnpm --filter @tennis-clubs/web exec vitest run
+      # Query budgets run in the Python unit tests above (tests/test_performance_budgets.py).
+      - name: Web bundle build (performance budget input)
+        run: pnpm --filter @tennis-clubs/web build
+      - name: Bundle size budget
+        run: python3 scripts/check-bundle-budget.py
