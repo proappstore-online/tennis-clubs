@@ -23,6 +23,22 @@ Platform owner or support override: not implemented. If one is added it must be 
 - **Inactive memberships** (`is_active = 0`) grant nothing.
 - A user may hold different roles in different clubs (one `club_memberships` row per club), and team access is granted separately per team.
 
+## Geography, competition authorities and scoped roles (issue #20)
+
+Clubs are still the tenant for every existing action. The new model sits above them, and the club-first checks above are unchanged.
+
+- **Geography:** `geo_areas` form a tree of `country → jurisdiction → region → locality`. The display label for each level is data in `geo_level_labels`, set by a site administrator with `set_geo_level_label`. A root area must be a country, and a child must sit under a higher level.
+- **Competition authorities:** `competition_authorities` (associations) belong to a geographic area and are not clubs. `authority_club_memberships` links a club to an authority, with one row per (authority, club), so a club can belong to several authorities without a duplicate club row. `competitions` belong to an authority.
+- **Scoped roles:** `scoped_role_grants` holds (user, scope type, scope id, role) with a `revoked_at` time instead of deletion. A user can hold different roles at different scopes. The roles are `site_admin`, `geo_admin`, `association_admin`, `club_admin`, `competition_manager`, `team_manager`, `scorer`, `member` and `viewer`. The site scope is the `site` row bootstrapped by the operator; it is not granted by a club.
+- **Who may grant:** a site administrator may grant any role. An association administrator may grant only `association_admin`, `competition_manager` or `viewer`, and only at their own authority. Nobody else may grant roles.
+- **Isolation:** association data (`list_authority_clubs`, `list_authority_competitions`) and association writes (`create_competition`, `link_club_to_authority`) check an active `association_admin` grant on that authority. Club administrators get nothing from their club role at association scope.
+- **Backfill:** each active club `admin` gets a mirror `club_admin` grant at club scope, recorded with `granted_by = migration-0020`. Convenors and managers are not mirrored, and no club is placed in an authority automatically.
+
+Known limits in this slice:
+- Club consent to join an association is not yet required; `link_club_to_authority` is an association-administrator action only.
+- Existing club actions still read `club_memberships` only, so `club_admin` grants do not yet widen or narrow club access.
+- A revoked grant cannot be re-granted, because the grant row is unique. Re-granting needs a later change.
+
 ## Access matrix
 
 | Area | Action | admin | convenor | manager | player | parent |

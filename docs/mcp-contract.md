@@ -181,6 +181,16 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_document_access_log` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_my_clubs` | query | `member` | member | read-only | no | yes | yes |
 | `check_document_upload` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
+| `create_geo_area` | execute | `site-admin` | admin | not-idempotent | yes | no | no |
+| `set_geo_level_label` | execute | `site-admin` | admin | idempotent | yes | no | no |
+| `create_competition_authority` | execute | `site-admin` | admin | not-idempotent | yes | no | no |
+| `grant_scoped_role` | execute | `scoped-admin` | admin | idempotent | yes | no | no |
+| `revoke_scoped_role` | execute | `scoped-admin` | admin | idempotent | yes | no | no |
+| `link_club_to_authority` | execute | `authority-admin` | admin | idempotent | yes | no | no |
+| `create_competition` | execute | `authority-admin` | admin | not-idempotent | yes | no | no |
+| `list_authority_clubs` | query | `authority-admin` | admin | read-only | no | yes | no |
+| `list_authority_competitions` | query | `authority-admin` | admin | read-only | no | yes | no |
+| `list_my_scoped_roles` | query | `authenticated` | self | read-only | no | yes | no |
 
 ### `list_my_fixtures`
 
@@ -873,7 +883,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `record_import_run_issues`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_competition`, `create_competition_authority`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_geo_area`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `grant_scoped_role`, `link_club_to_authority`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `record_import_run_issues`, `register_document`, `remove_fixture_roster_player`, `revoke_scoped_role`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_geo_level_label`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1723,3 +1733,152 @@ Authorise storing a registered document's file: returns the registered size, typ
 | `document_id` | string |
 
 Returns: `id`, `content_type`, `byte_size`, `sha256`
+
+### `create_geo_area`
+
+Site administrator adds an area to the geographic hierarchy; a root area must be a country and a child must sit under a higher level
+
+- Access: site-admin; roles: none (see access); audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `parent_id` | string |
+| `level` | string; one of `country`, `jurisdiction`, `region`, `locality` |
+| `name` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `set_geo_level_label`
+
+Site administrator sets the display label for a geographic level, so terminology is deployment configuration
+
+- Access: site-admin; roles: none (see access); audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `level` | string; one of `country`, `jurisdiction`, `region`, `locality` |
+| `label` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `create_competition_authority`
+
+Site administrator creates a competition authority (association) under a geographic area
+
+- Access: site-admin; roles: none (see access); audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `geo_area_id` | string |
+| `name` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `grant_scoped_role`
+
+Grant a scoped role: a site administrator may grant any role; an association administrator may grant association roles within their own authority
+
+- Access: scoped-admin; roles: none (see access); audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `user_id` | string |
+| `scope_type` | string; one of `site`, `geo_area`, `authority`, `club`, `competition`, `team` |
+| `scope_id` | string |
+| `role` | string; one of `site_admin`, `geo_admin`, `association_admin`, `club_admin`, `competition_manager`, `team_manager`, `scorer`, `member`, `viewer` |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `revoke_scoped_role`
+
+Revoke a scoped role grant; the grant is kept with a revoked time rather than deleted
+
+- Access: scoped-admin; roles: none (see access); audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `grant_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `link_club_to_authority`
+
+Association administrator links a club to their competition authority; a club may belong to several authorities
+
+- Access: authority-admin; roles: none (see access); audience: admin.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `authority_id` | string |
+| `org_id` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `create_competition`
+
+Association administrator creates a competition owned by their authority
+
+- Access: authority-admin; roles: none (see access); audience: admin.
+- Idempotency: not-idempotent. Audit: record with `record_audit_event`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `id` | string |
+| `authority_id` | string |
+| `name` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `list_authority_clubs`
+
+List the clubs linked to a competition authority, for that authority's administrators only
+
+- Access: authority-admin; roles: none (see access); audience: admin.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `authority_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `membership_id`, `authority_id`, `org_id`, `club_name`, `status`, `created_at`
+
+### `list_authority_competitions`
+
+List the competitions owned by a competition authority, for that authority's administrators only
+
+- Access: authority-admin; roles: none (see access); audience: admin.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `authority_id` | string |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `authority_id`, `name`, `created_at`, `updated_at`
+
+### `list_my_scoped_roles`
+
+List the caller's own active scoped role grants across every scope
+
+- Access: authenticated; roles: none (see access); audience: self.
+- Idempotency: read-only. Audit: not required.
+
+| Parameter | Constraints |
+| --- | --- |
+| `limit` | integer; default 100; min 1; max 100 |
+| `offset` | integer; default 0; min 0 |
+
+Returns: `id`, `scope_type`, `scope_id`, `role`, `created_at`

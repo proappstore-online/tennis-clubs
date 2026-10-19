@@ -253,6 +253,9 @@ class McpPermissionTests(unittest.TestCase):
     def test_every_action_has_a_permission_case(self):
         covered = set(MANAGER_WRITES) | set(MANAGER_WRITE_DENIALS_ONLY) | {
             "set_my_fixture_availability", "log_my_fixture_availability_change", "accept_team_invite",
+            # Scoped geography, authority and role actions: permission cases live in test_geo_authority_tenancy.py.
+            "create_geo_area", "set_geo_level_label", "create_competition_authority", "grant_scoped_role", "revoke_scoped_role",
+            "link_club_to_authority", "create_competition", "list_authority_clubs", "list_authority_competitions", "list_my_scoped_roles",
             "activate_invited_club_membership", "create_club", "bootstrap_club_admin", "can_create_first_club",
             "get_my_club_permissions", "get_club", "list_my_fixtures", "list_fixture_roster",
             "list_fixture_import_options", "list_managed_clubs", "list_club_seasons", "list_club_venues",
