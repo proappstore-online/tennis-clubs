@@ -11,6 +11,8 @@ from pathlib import Path
 
 EXPECTED_EMAIL = "2824906+serge-ivo@users.noreply.github.com"
 EXPECTED_NAME = "serge-ivo"
+# Already public on origin/main before this check existed: grandfathered for the identity rule only. Tree and secret scans still apply to it. Every other commit must use the noreply identity.
+GRANDFATHERED_IDENTITY_COMMITS = frozenset({"3b193a222600361043dd45a9ec2a58e5e1ab1195"})
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PATHS = (
     "docs/source-material/",
@@ -90,7 +92,7 @@ def main() -> int:
         )
         fields = metadata.split("\x1f", 4)
         author_name, author_email, committer_name, committer_email, message = fields
-        if (
+        if commit_id not in GRANDFATHERED_IDENTITY_COMMITS and (
             author_name != EXPECTED_NAME
             or author_email != EXPECTED_EMAIL
             or committer_name != EXPECTED_NAME
