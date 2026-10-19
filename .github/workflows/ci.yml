@@ -9,8 +9,17 @@ on:
     branches: [main]
 
 jobs:
+  route:
+    uses: serge-ivo/runner-router/.github/workflows/router.yml@v1
+    with:
+      included-minutes: 3000
+      self-hosted-labels: self-hosted,pags
+    secrets:
+      billing-token: ${{ secrets.ORG_BILLING_TOKEN }}
+
   typecheck:
-    runs-on: ubuntu-latest
+    needs: route
+    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,7 +35,8 @@ jobs:
       - run: pnpm typecheck
 
   test:
-    runs-on: ubuntu-latest
+    needs: route
+    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

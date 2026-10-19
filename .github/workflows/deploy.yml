@@ -20,11 +20,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  route:
+    uses: serge-ivo/runner-router/.github/workflows/router.yml@v1
+    with:
+      included-minutes: 3000
+      self-hosted-labels: self-hosted,pags
+    secrets:
+      billing-token: ${{ secrets.ORG_BILLING_TOKEN }}
+
   deploy:
+    needs: route
     # template-app itself is never served (no registry entry) and its build
     # fails its own placeholder check by design; the apps copied from it deploy.
     if: github.event.repository.name != 'template-app'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     outputs:
       has_e2e: ${{ steps.e2e-check.outputs.has_e2e }}
     steps:
@@ -36,6 +45,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # The macOS pags fallback has no guaranteed jq; the Linux image ships it.
+      - name: Install jq on macOS
+        if: runner.os == 'macOS'
+        run: command -v jq >/dev/null 2>&1 || brew install jq
 
       - name: Install
         run: if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install --no-frozen-lockfile; fi
@@ -172,6 +186,26 @@ jobs:
             echo "R2_ENDPOINT=$(echo "$RESP" | jq -r '.endpoint')"
           } >> "$GITHUB_ENV"
 
+      # ubuntu-latest ships the AWS CLI. The macOS pags fallback does not.
+      - name: Install AWS CLI on macOS
+        if: runner.os == 'macOS'
+        run: |
+          if command -v aws >/dev/null 2>&1; then
+            echo "aws already on PATH: $(command -v aws)"
+            exit 0
+          fi
+          brew install awscli
+          if ! command -v aws >/dev/null 2>&1; then
+            for dir in /opt/homebrew/bin /usr/local/bin; do
+              if [ -x "$dir/aws" ]; then
+                echo "$dir" >> "$GITHUB_PATH"
+                exit 0
+              fi
+            done
+            echo "::error::aws not on PATH after brew install"
+            exit 1
+          fi
+
       - name: Upload to R2
         env:
           AWS_DEFAULT_REGION: auto
@@ -202,9 +236,9 @@ jobs:
   # platform fixture session via the SDK's real sign-in path (no test bypass);
   # auth-gated specs skip when PAS_E2E_SESSION_TOKEN is unset.
   e2e:
-    needs: deploy
+    needs: [deploy, route]
     if: needs.deploy.outputs.has_e2e == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -215,7 +249,13 @@ jobs:
         run: npm install
       - name: Install Playwright browser
         working-directory: e2e
-        run: npx playwright install --with-deps chromium
+        run: |
+          # --with-deps installs apt packages, which only exists on Linux. macOS pags runners already have the libraries Playwright needs.
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
       - name: Run E2E against the live app
         id: e2e
         continue-on-error: true
