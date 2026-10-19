@@ -1,0 +1,22 @@
+{
+  "_comment": "Performance budgets (issue #35). Query budgets are milliseconds, the median of 7 runs after one warm-up, on the seeded association in tests/association_seed.py. Bundle budgets are gzipped kilobytes of web/dist/assets. Change a budget only with a recorded reason in docs/performance-budgets.md.",
+  "scale": {
+    "organizations": 40,
+    "seasons": 120,
+    "teams": 2800,
+    "team_players": 14000,
+    "external_clubs": 1400,
+    "fixtures": 20000
+  },
+  "query_ms": {
+    "list_my_fixtures.upcoming": 100,
+    "list_my_fixtures.past": 500,
+    "list_my_fixtures.all": 400,
+    "list_club_venues": 50,
+    "list_club_teams": 50
+  },
+  "bundle_gzip_kb": {
+    "js": 125,
+    "css": 8
+  }
+}
