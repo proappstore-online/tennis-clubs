@@ -39,6 +39,8 @@ function AuthenticatedApp({ user, signOut }: { user: { id: string; login: string
     hideFooter
     renderTopbar={({ appName, nav, profileMenu, textSizeToggle }) => (
       <header className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3 sm:px-6">
+        {/* The first Tab stop: keyboard and screen-reader users can skip the navigation and go straight to the page. */}
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-[var(--surface)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--ink)]">Skip to main content</a>
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3">
           <a href="/" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl text-lg font-bold text-[var(--ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]" aria-label="Tennis Clubs home">
             <span aria-hidden="true" className="text-2xl">🎾</span>
@@ -49,7 +51,7 @@ function AuthenticatedApp({ user, signOut }: { user: { id: string; login: string
         </div>
       </header>
     )}
-  >{page}</ProShell>
+  ><div id="main-content" tabIndex={-1} className="outline-none">{page}</div></ProShell>
 }
 
 function GoogleSignIn() {

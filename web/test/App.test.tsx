@@ -85,7 +85,8 @@ describe('App authentication composition', () => {
     const shell = screen.getByTestId('pro-shell')
     expect(shell.getAttribute('data-hide-footer')).toBe('true')
     expect(screen.getByRole('banner').textContent).toContain('Tennis Clubs')
-    expect(screen.getByRole('banner').firstElementChild?.className).toContain('flex-wrap')
+    // The skip link comes first in the banner; the layout container below it must still wrap on small screens.
+    expect(screen.getByRole('banner').querySelector('.flex-wrap')).toBeTruthy()
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Text size' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Profile and account' })).toBeTruthy()

@@ -185,10 +185,30 @@ button:active {
 :root[data-text='lg'] { font-size: 118.75%; }
 :root[data-text='sm'] { font-size: 87.5%; }
 
+/* Keyboard focus is visible on every interactive control, not only buttons and links. */
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--sky) 52%, white);
   outline-offset: 3px;
+}
+
+/* Motion is decorative: users who ask for less get no transitions, animations or press-scale. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  button:active {
+    transform: none;
+  }
 }
 
 @media (min-width: 1024px) {
