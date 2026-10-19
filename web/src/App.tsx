@@ -132,7 +132,7 @@ function Comps({ user, onSignOut }: { user: { id: string; login: string }; onSig
   const pending = upcoming.filter((fixture) => !fixture.my_availability || fixture.my_availability === 'pending').length
 
 
-  return <main className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 sm:py-10">
+  return <main className="container-app py-7 sm:py-10">
     <section className="rounded-3xl border border-[var(--line)] bg-[var(--accent-gradient)] p-6 shadow-[var(--shadow-card)] sm:p-8">
       <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-2xl" aria-hidden>🎾</span>
       <PageHeader title="Comps" description="Your fixtures, team roster and match-day details in one place." />

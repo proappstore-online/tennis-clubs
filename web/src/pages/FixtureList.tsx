@@ -70,7 +70,7 @@ export default function FixtureList({ app }: { app: ProAppStore }) {
 
   const emptyMessage = filtersApplied ? 'No fixtures match these filters.' : mode === 'past' ? 'No past fixtures are available for your teams.' : mode === 'all' ? 'No fixtures are available for your teams.' : 'No upcoming fixtures are available for your teams.'
 
-  return <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6"><h1 className="display-font text-3xl font-bold text-[var(--ink)]">Fixtures</h1><p className="mt-2 text-sm text-[var(--muted)]">Fixtures for teams you belong to. Player and contact records are not shown here.</p>
+  return <main className="container-app py-8"><h1 className="display-font text-3xl font-bold text-[var(--ink)]">Fixtures</h1><p className="mt-2 text-sm text-[var(--muted)]">Fixtures for teams you belong to. Player and contact records are not shown here.</p>
 
     <div role="tablist" aria-label="Fixture period" className="mt-5 inline-flex rounded-xl border border-[var(--line)] bg-[var(--surface)] p-1">
       {MODES.map(([value, label]) => <button key={value} role="tab" id={`fixtures-tab-${value}`} aria-selected={mode === value} aria-controls="fixtures-panel" tabIndex={mode === value ? 0 : -1} onClick={() => setMode(value)} className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${mode === value ? 'bg-[var(--accent)] text-white' : 'text-[var(--ink)] hover:bg-[var(--paper-deep)]'}`}>{label}</button>)}

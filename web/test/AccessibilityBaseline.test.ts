@@ -35,6 +35,33 @@ describe('responsive design system', () => {
       expect(query).not.toMatch(/max-width/)
     }
   })
+
+  it('design tokens: spacing scale present', () => {
+    expect(css).toContain('--space-4')
+    expect(css).toContain('--space-8')
+  })
+
+  it('design tokens: type scale present', () => {
+    expect(css).toContain('--text-base')
+    expect(css).toContain('--text-3xl')
+  })
+
+  it('design tokens: --surface defined in light and dark themes', () => {
+    expect(css).toContain('--surface:')
+    expect(css.indexOf("--surface: #1e2128")).toBeGreaterThan(css.indexOf(":root[data-theme='dark']"))
+  })
+
+  it('layout primitives: container-app defined', () => {
+    expect(css).toContain('.container-app')
+  })
+
+  it('layout primitives: stack defined', () => {
+    expect(css).toContain('.stack {')
+  })
+
+  it('layout primitives: grid-auto defined', () => {
+    expect(css).toContain('.grid-auto')
+  })
 })
 
 describe('skip link and main landmark target', () => {

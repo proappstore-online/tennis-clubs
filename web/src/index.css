@@ -49,9 +49,42 @@
   --radius: 0.75rem;
   --radius-sm: 0.5rem;
   --shadow: var(--shadow-card);
+
+  /* Design tokens (issue #31): spacing, type scale and radius on one scale. */
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* border-radius: --radius and --radius-sm are defined above */
+  --radius-xs: 0.25rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  /* surface: used by the page components but previously never defined */
+  --surface: #ffffff;
+
+  /* breakpoints as custom media (informational; real breakpoints use min-width in @media) */
+  /* bp-sm=640px  bp-md=768px  bp-lg=1024px  bp-xl=1280px */
 }
 
 :root[data-theme='dark'] {
+  --surface: #1e2128;
+
   color-scheme: dark;
   --paper: #000000;
   --paper-deep: #0a0a0a;
@@ -218,6 +251,40 @@ textarea:focus-visible {
       radial-gradient(circle at 88% 14%, var(--bg-blob-2), transparent 24%),
       linear-gradient(180deg, var(--bg-start) 0%, var(--bg-mid) 48%, var(--bg-end) 100%);
   }
+}
+
+/* ── Layout primitives (mobile-first) ── */
+
+/* Container */
+.container-app {
+  width: 100%;
+  max-width: 80rem;          /* 1280px */
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+@media (min-width: 640px) {
+  .container-app { padding-inline: var(--space-6); }
+}
+@media (min-width: 1024px) {
+  .container-app { padding-inline: var(--space-8); }
+}
+
+/* Stack */
+.stack { display: flex; flex-direction: column; gap: var(--space-4); }
+.stack-sm { display: flex; flex-direction: column; gap: var(--space-2); }
+.stack-lg { display: flex; flex-direction: column; gap: var(--space-8); }
+
+/* Grid */
+.grid-auto {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .grid-auto { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .grid-auto { grid-template-columns: repeat(3, 1fr); }
 }
 
 } /* end @layer base */
