@@ -6,10 +6,18 @@ Issue #26. This page records what the platform quality work has delivered, how e
 
 | Acceptance | Status | Evidence |
 | --- | --- | --- |
-| 1. Public directory and fixture pages work on a phone, keyboard and screen reader | **Partly met.** Keyboard and semantics are tested in jsdom and by axe. Phone-size and screen-reader behaviour are not checked in a real browser. | `web/test/DirectoryAccessibility.test.tsx`, `AxeDirectoryFixtures.test.tsx`, `AccessibilityBaseline.test.ts`. Browser verification is a follow-up (see below). |
+| 1. Public directory and fixture pages work on a phone, keyboard and screen reader (read as signed-in pages, see "Decisions" below) | **Partly met.** Keyboard and semantics are tested in jsdom and by axe. Phone-width layout and screen-reader behaviour are not checked: jsdom does not lay out CSS, so a jsdom test at a narrow width would not test layout. | `web/test/DirectoryAccessibility.test.tsx`, `AxeDirectoryFixtures.test.tsx`, `AccessibilityBaseline.test.ts`. Browser verification is a follow-up (see below). |
 | 2. Authorised data is traceable without personal data in application logs | Met for telemetry. | `docs/telemetry.md`, `web/test/SafeLogging.test.ts`, `TelemetryGuard.test.ts`, `tests/test_telemetry_schema.py`. |
 | 3. Core public pages have measurable performance and error telemetry | Met. | `page.load`, `page.view` and `page.error` in `docs/telemetry.md`; budgets in `docs/performance-budgets.md`. |
 | 4. Every epic has documented privacy, accessibility and rollback considerations | Met by this page, for #20 to #25. Each row below is a decision or a stated open question. | The table in "Child epics" below. |
+
+## Decisions
+
+- **Acceptance 1 covers signed-in pages.** CLAUDE.md says all database operations require sign-in, and there is no anonymous read access. So "public directory and fixture pages" means pages that any signed-in user can see, not pages open to anonymous visitors. `PUBLIC_ROUTES` in `web/src/seo.ts` stays `/`, the sign-in route.
+- **The directory page is `Comps`** (`web/src/App.tsx`). There is no `ClubDirectory` component. The fixture page is `web/src/pages/FixtureList.tsx`.
+- **Axe coverage** is in `web/test/AxeDirectoryFixtures.test.tsx`. It covers the fixture page with fixtures, empty and error states, and the directory page with fixtures and the fixture dialog open.
+- **No phone-width jsdom tests.** A test at a narrow `window.innerWidth` would not change what these components render, so it would show nothing about layout. Phone layout needs a browser check (see Follow-ups).
+- **Open items are not duplicated as new issues.** The open positions below belong to #20 to #25, which already track the features they depend on. They stay open until those epics build the features.
 
 ## Design system and accessibility baseline (#31, #32)
 
