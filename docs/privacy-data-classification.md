@@ -1,73 +1,102 @@
-# Privacy: data classification and retention
+# Privacy: data classification, retention, logging and location
 
-Status: **proposed**. The classes and table map below describe the schema as of migration `0019_import_run_issues`. The retention periods are proposals for the club owner to confirm before any deletion job is built. Erasure and export workflows are not built yet (see [Open items](#open-items)).
+Status: **proposed retention, enforced classification**. Every column in the schema has a class in [`data-classification.json`](data-classification.json), and `tests/test_data_classification.py` fails when the schema and that file disagree. The retention periods are proposals for the club owner to confirm before any deletion job is built. No automated deletion exists yet (see [Deletion and rollback](#deletion-and-rollback)).
 
-This document covers issue #34 (slice 4 of #26). It is the reference for what may be stored, how long, and what may appear in logs.
+This document covers issues #34 and #29. It is the reference for what may be stored, how long, what may appear in logs and audit records, and where location may be used.
 
 ## Classes
 
 | Class | What it is | Examples | Visible to |
 | --- | --- | --- | --- |
-| **P0 Public club information** | Names and public access details that a club publishes. | Club, team, season, division and competition names; venue name, address and map link (ClubAdmin says "public access details only"); fixture times, rounds and scores. | Any signed-in member of the club. |
-| **P1 Member personal data** | Who a person is in the club and what they did with a fixture. | Display names; team membership; availability (`in`/`out`/`pending`); roster selection; external opponent names entered by a manager. | Members of the same team; managers and admins of the club. |
-| **P2 Contact details** | Ways to reach a person or a venue contact. | `contact_details` rows (`phone`, `email`, `postal`, `other`); convenor phone on venues. | Managers and admins only. Never shown in a player view, a roster, an import preview or a log. |
-| **P3 Activity and audit records** | Who changed what, and who accessed a document. | `audit_events`, `import_runs`, `document_access_log`, `fixture_roster_activity`, `team_pool_history`, `fixture_selection_history`, import provenance and `source_row`. | Managers and admins; the platform audit. |
-| **P4 Uploaded files** | Files a person uploads or a club stores. | Scorecards (`fixture_result_submissions`); library documents in `documents`. | Per the document's `visibility` and the uploader's role. |
+| `public` | Names and public access details a club publishes. | Club, season, division, team and venue names; venue address, map link and access notes; fixture times, rounds, scores and submitted set results; opponent club names. | Any signed-in member of the club. |
+| `personal` | Identifies a person, or what they did with a fixture or squad. | Display and player names; memberships; availability, selection and pool; identifiers of people (`user_id`, actor and creator IDs); free text that may name someone (fixture notes, match notices, correction notes, import messages). | Members of the same team; managers and admins of the club. |
+| `contact` | A way to reach a person or a venue contact. | `contact_details` values and labels; venue convenor phone; roster contact (always `NULL`). | Managers and admins only. Never shown in a player view, a roster, an import preview or a log. |
+| `activity` | Audit and history records: who changed what and when. | `audit_events.target_id` and the history tables. | Managers and admins. |
+| `scorecard` | A scorecard file reference and the person who uploaded it. Files are R2 objects, outside the competition archive. | `fixture_result_submissions.scorecard_path`, `scorecard_user_id`. | Per the club's scorecard rules; the file is not in the archive. |
+| `document` | A stored library document file (R2). | `documents.storage_key`. | Per the document's `visibility`. |
+| `secret` | A credential. | `team_memberships.invite_token`. | Nobody after the invitation is claimed. |
+| `technical` | An identifier, timestamp, count, enumerated state or hash that carries no personal information by itself. | IDs, `created_at`, `confirmed_at`, `payload_sha256`, counts. | Wherever its record is visible. |
+| `junior` | **Reserved.** Data about a person under 18. None is stored. | none | No one, until a retention rule and a minimisation decision exist. |
+| `location` | **Reserved.** A person's or a venue's location beyond a public address. None is stored. | none | Only with recorded consent, and not stored server-side (see [Location](#location)). |
 
-Rule of thumb: if a value identifies a person, or links a person to a club, a fixture or a contact, it is P1 or above. Club, team and venue names are P0 unless they name a person.
+Rule of thumb: if a value identifies a person, or links a person to a club, a fixture, a squad or a contact, it is `personal` or higher. Club, team, season, division and venue names are `public`, unless they name a person.
 
-## Table map
-
-Columns marked *personal* are the ones that hold P1 to P4 values. Other columns in these tables are opaque IDs, counts or timestamps.
-
-| Table (migration) | Class | Personal columns |
-| --- | --- | --- |
-| `club_memberships` (0002) | P1 | `user_id`, `display_name` |
-| `club_admin_invites`, `team_memberships` (0003, 0004) | P1 | `user_id`, `display_name`, `created_by` |
-| `team_players` (0002) | P1 | `user_id` |
-| `roster_players` (0003) | P1 | `player_name` |
-| `fixture_roster` (0002) | P1 | `user_id`, availability, selection |
-| `fixture_roster_activity` (0004) | P3 | `user_id`, `display_name`, `actor_user_id` |
-| `fixture_result_submissions` (0007) | P3 / P4 | `scorecard_user_id`, scorecard file reference |
-| `import_runs` (0008) | P3 | `actor_user_id` |
-| `audit_events` (0008) | P3 | `actor_user_id`, target identifiers |
-| `team_pool_history`, `fixture_selection_history` (0010) | P3 | `user_id`, `actor_user_id`, `updated_by` |
-| `import_issue_resolutions` (0011) | P3 | `actor_user_id`, `source_row`, `source_date_raw`, `source_time_raw` |
-| `import_provenance`, `draw_import_runs`, `draw_import_outcomes`, `draw_import_records` (0012, 0013) | P3 | `importer_user_id`, `payload_sha256`; records may hold names from the source file |
-| `contact_details` (0014) | P2 | `value` (phone, email, postal), `created_by` |
-| `venues.convenor_phone` (0005; copied into `contact_details` by 0014) | P2 | phone |
-| `documents`, `document_history`, `document_access_log` (0015) | P3 / P4 | `actor_user_id`, storage key, file |
-| `import_run_issues` (0019) | P3 | `source_row` |
-| `organizations`, `seasons`, `divisions`, `teams`, `venues` (address, map link, notes), `fixtures`, `external_clubs` | P0 | Free-text `notes` on a venue must not hold contact details (the import blocks them; see `test_venue_notes_with_contact_details_block_the_import` in `tests/test_competition_draw.py`). |
-
-## Retention (proposed)
+## Retention
 
 | Class | Keep while | Then | Proposal |
 | --- | --- | --- | --- |
-| P0 | The season or club exists. | Archive with the season; remove on club deletion. | Keep names and results for the historical record. |
-| P1 | The person is in a team for the season. | Remove the person's link to a team and their availability 12 months after the season ends. Keep the fixture and its P0 result. | 12 months after season end. |
-| P2 | The contact is current. | Remove when the membership ends or the contact is replaced; remove on request. | On request, and when the membership ends. |
-| P3 | The audit is needed for traceability. | Delete the personal identifiers in audit rows after the proposed period; keep the action and counts. | 2 years. Authorised changes stay traceable for that period (issue #34 acceptance). |
-| P4 | The document is current (`expires_on`) or the season is current. | Delete the file; keep the document record and its `status`. | 12 months after the season ends, or at `expires_on` if earlier. |
+| `public` | The season or club exists. | Archive with the season; remove on club deletion. | Keep names and results for the historical record. |
+| `personal` | The person is on the team for the season. | Remove the person's squad and roster links 12 months after the season ends. The fixture and its public result are kept. | 12 months after season end, or sooner on request. |
+| `contact` | The contact is current. | Remove when the membership ends, when the contact is replaced, or on request. | On request, and when the membership ends. |
+| `activity` | The audit is needed for traceability. | Remove the identifiers of people from audit and history rows; keep the action, the target record and the counts. | 2 years, proposed. |
+| `scorecard` | The season is current. | Delete the file; keep the record and its status. | 12 months after the season ends, or sooner on request. |
+| `document` | The document is current (`expires_on`). | Delete the file; keep the record and its status. | At `expires_on`, and 12 months after the season, whichever is earlier. |
+| `secret` | The invitation is unclaimed. | Clear on claim; expire after 7 days. | 7 days, and at claim. |
+| `technical` | Its record is kept. | Goes with its record. | With the record it belongs to. |
+| `junior`, `location` | Not applicable: none stored. | A retention rule must be written before any column of this class is added. | — |
 
-Deletion must go through the server, under the same role gates as the write it reverses. No client code deletes personal data directly.
+Two cases the issue names:
+
+- **A player leaves a team.** The `team_players` row is deactivated, not deleted, so history still names the person. The player's pool and squad row remain until the season retention ends. The team's pool history is kept as `activity` for two years. Their availability on fixtures already played is kept as `personal` until the season retention ends.
+- **A season closes.** Public results stay. The people-linked rows (squad, roster, availability, scorecard references) follow the `personal` and `scorecard` rules above, counted from the season end.
+
+## Table map
+
+The map is in [`data-classification.json`](data-classification.json), one entry per column. Summary by table:
+
+- **Personal:** `club_memberships`, `team_memberships`, `team_players`, `fixture_roster`, `roster_players`, `fixtures` (notes, match notice, reviewer), `fixture_result_submissions` (submitter, correction note, scorecard references), `organizations.created_by`, `team_pool_history`, `fixture_selection_history`, `fixture_roster_activity`, `import_runs`, `import_issue_resolutions`, `import_run_issues`, `import_provenance`, `draw_import_*`, `documents`, `document_history`, `document_access_log`, `archive_run`, `items`.
+- **Contact:** `contact_details`, `venues.convenor_phone`, `roster_players.contact` (always `NULL`; see `test_the_roster_contact_column_is_only_ever_written_as_null`).
+- **Secret:** `team_memberships.invite_token`.
+- **Scorecard:** `fixture_result_submissions.scorecard_path`, `scorecard_user_id`.
+- **Document:** `documents.storage_key`.
+- **Public:** club, season, division, team, venue and opponent club names; venue address, map link and access notes; fixture results and times.
 
 ## Logging
 
-Application logs must never carry P1 to P4 values. Log opaque record identifiers only (for example an organisation, team, venue or fixture UUID), and an action name. Identifiers that link to a person (`user_id`, actor and creator IDs, scorecard IDs) are personal and are not logged either. The record of who did what belongs in the audit tables (P3), not in logs.
+Application logs must never carry `personal`, `contact`, `secret` or `scorecard` values. Log opaque record identifiers only (an organisation, team, venue or fixture UUID), and an action name. Identifiers that link to a person (`user_id`, actor and creator IDs) are personal and are not logged.
 
-- The web app writes logs through `web/src/privacy/redact.ts` (`safeLog`), which removes personal-data keys and values before anything is printed. A guard test (`web/test/SafeLogging.test.ts`) fails if any file in `web/src` or `worker/src` calls `console` directly instead of going through `safeLog`.
+- The web app writes logs through `web/src/privacy/redact.ts` (`safeLog`), which removes personal-data keys and values before anything is printed. `web/test/SafeLogging.test.ts` fails if any file in `web/src` or `worker/src` calls `console` directly instead of going through `safeLog`.
 - Structured telemetry (imports, score submission, refused writes, page timing) goes through the schema in `web/src/telemetry/`, which accepts counts, durations and tokens only. See `docs/telemetry.md`.
 - Platform logs (the PAS runtime, Cloudflare) are outside this repo. The app must not send personal data to them.
 
+## Audit payloads
+
+An audit row is the action, the outcome, the actor, the club and a target. The target is a record identifier, not a description of it.
+
+- `record_audit_event` refuses a target that contains an e-mail address, a space, or a value longer than a record identifier. Roster audit targets are `fixture-id:user-id`; they carry identifiers only.
+- Person identifiers in audit rows are `personal` and are kept as identifiers for traceability (manager-only). They are never names, contacts or free text.
+- A test (`tests/test_audit_payloads.py`) fails if an audit row would hold a name, a contact or free text.
+
 ## Location
 
-- Venue addresses and map links are P0 public access details. Opening a map link sends the venue address, not the user's location.
-- The user's own location is personal data and is never requested without consent. See `web/src/location/consent.ts`. Consent is recorded per user in the SDK's per-user store (`app.kv`), can be withdrawn, and gates every location request. No location is stored server-side.
-- A guard test (`web/test/LocationConsent.test.ts`) fails if any other source file mentions `geolocation`. A future feature that needs the user's location must call that module, and must not store a location without a new decision recorded here.
+- **Venue addresses and map links are `public`.** A map link is an ordinary link: the map opens only when a user clicks it, and it sends the venue address to the map service, not the user's location. No map is embedded and no map tile or script is loaded. `tests/test_privacy_surfaces.py` fails if a map embed or a third-party map script appears in the app.
+- **Player and user location is not stored and not requested.** The consent gate (`web/src/location/consent.ts`) is the only code that may read the device location. It records consent per user in the SDK's per-user store (`app.kv`), can be withdrawn, and gates every request. A guard test (`web/test/LocationConsent.test.ts`) fails if any other source file mentions `geolocation`.
+- **The platform analytics script** (`api.proappstore.online/v1/analytics.js`) is loaded by `web/index.html` on every page. It is provided by the platform, and the app does not send it location or personal data. It is recorded here as a platform dependency, not a consent-gated feature. `tests/test_privacy_surfaces.py` fails if any other third-party script is added.
+
+## Junior data
+
+No date of birth, age, guardian or junior flag is stored. The `junior` class is reserved. `tests/test_data_classification.py` fails if a column name suggests such data (`dob`, `birth`, `age`, `junior`, `minor`, `guardian`) or uses the reserved class. A future junior feature needs a retention rule, a parental-consent decision, and a change to this document before any column is added.
+
+## Deletion and rollback
+
+No deletion job exists, and no action deletes personal data in bulk. The steps below are the procedure until one does. Each class is removed with the server action for its record, under the same role gate as the write it reverses. Client code never deletes data directly.
+
+| Class | Deletion step | Rollback step |
+| --- | --- | --- |
+| `contact` | Use `delete_contact_detail` (managers). | Re-enter the contact with `set_contact_detail`. The value is not kept elsewhere. |
+| `personal` (squad) | Use `deactivate_team_player`, then clear the squad row through the platform administrator. | Reactivate with `set_team_player_pool`. Use the archive restore for records removed after an archive was taken. |
+| `personal` (roster) | Use `remove_fixture_roster_player`. | Add back with `add_fixture_roster_player`, or restore from an archive taken before the removal. |
+| `scorecard` | Withdraw the record with the document actions, then remove the file through the platform administrator. | Restore the record from an archive. The file cannot be restored from this repository. |
+| `document` | `withdraw_document` (the record stays for history). | Restore the record from an archive, then re-register the file. |
+| `activity` | Retention job not built: removal is by the platform administrator, under the rule above. | None. Audit rows are not changed by the app. |
+| `public` | Removed with the club or season. | Restore from the club archive (`restore_archive_*`). |
+| `secret` | Clear the invitation (issue a new one, or let it expire). | Issue a fresh invitation. |
+
+Before any deletion, take a checkpoint export with `export_competition_archive` (see [`competition-archive-runbook.md`](competition-archive-runbook.md)). The archive restore is the only way back for removed competition records, and it only restores records that were in the archive.
 
 ## Open items
 
-- The owner confirms the retention periods above.
-- An erasure and export workflow per person (follow-up to #29).
-- No server-side deletion job exists yet; the retention periods are not enforced until one does.
+- The club owner confirms the retention periods above.
+- A per-person erasure and export workflow (the rule for each class is written; the workflow is not built).
+- No server-side deletion job exists. Retention periods are not enforced until one does.
+- The analytics script is platform-owned. Its consent and retention are the platform's, and the app cannot change them.

@@ -1,0 +1,392 @@
+{
+  "_comment": "Column classification for every table in migrations.json (issue #29). Every column must appear here; tests/test_data_classification.py fails on any unclassified or stale column. Retention rules are proposals for owner confirmation, as in docs/privacy-data-classification.md.",
+  "classes": {
+    "public": {
+      "meaning": "Club, team, season, venue access details and results that the club publishes to its members.",
+      "retention": "Kept with the season or club. Removed when the club is deleted."
+    },
+    "personal": {
+      "meaning": "Identifies a person or what they did: names, memberships, roster states, free text that may name someone, and identifiers of people.",
+      "retention": "While the person is on the team for the season. Then the person-linked rows are removed 12 months after the season ends, and the fixture and its public result are kept. Removed sooner on request."
+    },
+    "contact": {
+      "meaning": "A way to reach a person or a venue contact.",
+      "retention": "While the contact is current. Removed when the membership ends, when the contact is replaced, or on request."
+    },
+    "activity": {
+      "meaning": "Audit and history records: who changed what, and when.",
+      "retention": "2 years from the change, proposed. Personal identifiers in these rows are removed at that point; the action and counts are kept."
+    },
+    "scorecard": {
+      "meaning": "Scorecard file references and the uploader of a scorecard. The files are R2 objects, out of scope for the archive.",
+      "retention": "12 months after the season ends, or sooner on request. The record keeps its status."
+    },
+    "document": {
+      "meaning": "Stored library document files (R2).",
+      "retention": "Until the document expires (expires_on), and 12 months after the season, whichever is earlier."
+    },
+    "secret": {
+      "meaning": "Credentials such as invitation tokens.",
+      "retention": "Cleared when the invitation is claimed, and at the latest 7 days after it is issued."
+    },
+    "technical": {
+      "meaning": "Identifiers, timestamps, counts, enumerated states and hashes that carry no personal information on their own.",
+      "retention": "Kept with the record they belong to."
+    },
+    "junior": {
+      "meaning": "Reserved. Data about a person under 18. None is stored. Retention must be defined before any such column is added.",
+      "retention": "Not applicable until a column is added; the rule must be written first."
+    },
+    "location": {
+      "meaning": "Reserved. A person’s or a venue’s location beyond a public address. None is stored; only consent-gated use is allowed.",
+      "retention": "Not applicable until a column is added; only with recorded consent (see web/src/location/consent.ts)."
+    }
+  },
+  "tables": {
+    "archive_run": {
+      "archived_at": "technical",
+      "direction": "technical",
+      "id": "technical",
+      "performed_by": "personal",
+      "row_counts": "technical"
+    },
+    "audit_events": {
+      "action": "technical",
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "id": "technical",
+      "org_id": "technical",
+      "outcome": "technical",
+      "target_id": "activity",
+      "target_type": "technical"
+    },
+    "club_memberships": {
+      "created_at": "technical",
+      "display_name": "personal",
+      "id": "technical",
+      "is_active": "technical",
+      "org_id": "technical",
+      "role": "personal",
+      "user_id": "personal"
+    },
+    "contact_details": {
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "kind": "contact",
+      "label": "contact",
+      "org_id": "technical",
+      "subject_id": "technical",
+      "subject_type": "technical",
+      "updated_at": "technical",
+      "value": "contact"
+    },
+    "divisions": {
+      "created_at": "technical",
+      "format": "public",
+      "id": "technical",
+      "name": "public",
+      "season_id": "technical"
+    },
+    "document_access_log": {
+      "action": "technical",
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "document_id": "technical",
+      "id": "technical",
+      "org_id": "technical",
+      "outcome": "technical"
+    },
+    "document_history": {
+      "action": "technical",
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "document_id": "technical",
+      "id": "technical",
+      "new_visibility": "technical",
+      "old_visibility": "technical",
+      "org_id": "technical"
+    },
+    "documents": {
+      "byte_size": "technical",
+      "category": "technical",
+      "content_type": "technical",
+      "created_at": "technical",
+      "description": "personal",
+      "effective_on": "technical",
+      "expires_on": "technical",
+      "id": "technical",
+      "org_id": "technical",
+      "revision": "technical",
+      "scope_id": "technical",
+      "scope_type": "technical",
+      "sha256": "technical",
+      "source_attribution": "personal",
+      "status": "technical",
+      "storage_key": "document",
+      "team_id": "technical",
+      "title": "public",
+      "updated_at": "technical",
+      "uploaded_by": "personal",
+      "visibility": "technical"
+    },
+    "draw_import_outcomes": {
+      "action": "technical",
+      "created_at": "technical",
+      "entity_type": "technical",
+      "id": "technical",
+      "message": "personal",
+      "org_id": "technical",
+      "run_id": "technical",
+      "severity": "technical",
+      "source_key": "personal"
+    },
+    "draw_import_records": {
+      "action": "technical",
+      "created_at": "technical",
+      "entity_type": "technical",
+      "id": "technical",
+      "message": "personal",
+      "org_id": "technical",
+      "outcome": "technical",
+      "run_id": "technical",
+      "severity": "technical",
+      "source_key": "personal",
+      "warning": "technical"
+    },
+    "draw_import_runs": {
+      "created_at": "technical",
+      "id": "technical",
+      "importer_user_id": "personal",
+      "org_id": "technical",
+      "payload_sha256": "technical",
+      "source_run": "technical",
+      "source_system": "technical"
+    },
+    "external_club_aliases": {
+      "alias": "public",
+      "created_at": "technical",
+      "external_club_id": "technical",
+      "id": "technical",
+      "normalized_alias": "public",
+      "org_id": "technical"
+    },
+    "external_clubs": {
+      "canonical_name": "public",
+      "created_at": "technical",
+      "home_venue_id": "technical",
+      "id": "technical",
+      "normalized_name": "public",
+      "org_id": "technical",
+      "updated_at": "technical"
+    },
+    "fixture_result_submissions": {
+      "away_score": "technical",
+      "correction_note": "personal",
+      "fixture_id": "technical",
+      "home_score": "technical",
+      "id": "technical",
+      "scorecard_path": "scorecard",
+      "scorecard_user_id": "scorecard",
+      "set_results": "public",
+      "submitted_at": "technical",
+      "submitted_by": "personal"
+    },
+    "fixture_roster": {
+      "availability": "personal",
+      "confirmed_at": "technical",
+      "display_name": "personal",
+      "fixture_id": "technical",
+      "pool": "personal",
+      "selection": "personal",
+      "updated_at": "technical",
+      "updated_by": "personal",
+      "user_id": "personal"
+    },
+    "fixture_roster_activity": {
+      "action": "technical",
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "display_name": "personal",
+      "fixture_id": "technical",
+      "id": "technical",
+      "new_availability": "personal",
+      "old_availability": "personal",
+      "user_id": "personal"
+    },
+    "fixture_selection_history": {
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "display_name": "personal",
+      "fixture_id": "technical",
+      "id": "technical",
+      "new_selection": "personal",
+      "old_selection": "personal",
+      "org_id": "technical",
+      "pool": "personal",
+      "user_id": "personal"
+    },
+    "fixtures": {
+      "arrival_at": "public",
+      "away_score": "public",
+      "away_team_id": "technical",
+      "created_at": "technical",
+      "division_id": "technical",
+      "home_score": "public",
+      "home_team_id": "technical",
+      "id": "technical",
+      "match_notice": "personal",
+      "notes": "personal",
+      "org_id": "technical",
+      "review_status": "technical",
+      "reviewed_at": "technical",
+      "reviewed_by": "personal",
+      "round_label": "public",
+      "source_date_raw": "personal",
+      "source_import_run_id": "technical",
+      "source_row": "personal",
+      "source_time_raw": "personal",
+      "starts_at": "public",
+      "status": "public",
+      "status_updated_at": "technical",
+      "time_status": "public",
+      "updated_at": "technical",
+      "venue_id": "technical"
+    },
+    "import_issue_resolutions": {
+      "actor_user_id": "personal",
+      "code": "technical",
+      "created_at": "technical",
+      "id": "technical",
+      "import_run_id": "technical",
+      "org_id": "technical",
+      "resolution": "technical",
+      "source_row": "technical"
+    },
+    "import_provenance": {
+      "created_at": "technical",
+      "entity_id": "technical",
+      "entity_type": "technical",
+      "fingerprint": "technical",
+      "id": "technical",
+      "import_run_id": "technical",
+      "org_id": "technical",
+      "source_key": "personal",
+      "source_system": "technical",
+      "updated_at": "technical"
+    },
+    "import_run_issues": {
+      "code": "technical",
+      "created_at": "technical",
+      "field": "technical",
+      "id": "technical",
+      "import_run_id": "technical",
+      "message": "personal",
+      "org_id": "technical",
+      "remediation": "personal",
+      "severity": "technical",
+      "source_row": "technical"
+    },
+    "import_runs": {
+      "acknowledged_count": "technical",
+      "actor_user_id": "personal",
+      "blocking_count": "technical",
+      "created_at": "technical",
+      "id": "technical",
+      "kind": "technical",
+      "org_id": "technical",
+      "received_count": "technical",
+      "rejected_count": "technical",
+      "saved_count": "technical",
+      "source_sha256": "technical",
+      "status": "technical",
+      "warning_count": "technical"
+    },
+    "items": {
+      "created_at": "technical",
+      "id": "technical",
+      "status": "technical",
+      "title": "personal",
+      "user_id": "personal"
+    },
+    "organizations": {
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "logo_url": "public",
+      "name": "public",
+      "slug": "public"
+    },
+    "roster_players": {
+      "availability": "personal",
+      "contact": "contact",
+      "created_at": "technical",
+      "fixture_id": "technical",
+      "id": "technical",
+      "player_name": "personal"
+    },
+    "seasons": {
+      "created_at": "technical",
+      "ends_on": "technical",
+      "id": "technical",
+      "name": "public",
+      "org_id": "technical",
+      "starts_on": "technical",
+      "status": "technical"
+    },
+    "team_memberships": {
+      "accepted_at": "technical",
+      "created_at": "technical",
+      "created_by": "personal",
+      "display_name": "personal",
+      "id": "technical",
+      "invite_token": "secret",
+      "org_id": "technical",
+      "team_id": "technical",
+      "user_id": "personal"
+    },
+    "team_players": {
+      "display_name": "personal",
+      "is_active": "personal",
+      "pool": "personal",
+      "team_id": "technical",
+      "updated_at": "technical",
+      "updated_by": "personal",
+      "user_id": "personal"
+    },
+    "team_pool_history": {
+      "action": "technical",
+      "actor_user_id": "personal",
+      "created_at": "technical",
+      "display_name": "personal",
+      "id": "technical",
+      "new_pool": "technical",
+      "old_pool": "technical",
+      "org_id": "technical",
+      "team_id": "technical",
+      "user_id": "personal"
+    },
+    "teams": {
+      "colour": "public",
+      "created_at": "technical",
+      "division_id": "technical",
+      "external_club_id": "technical",
+      "id": "technical",
+      "is_external": "technical",
+      "name": "public",
+      "org_id": "technical"
+    },
+    "venues": {
+      "address": "public",
+      "convenor_phone": "contact",
+      "created_at": "technical",
+      "id": "technical",
+      "map_url": "public",
+      "name": "public",
+      "notes": "public",
+      "org_id": "technical",
+      "shared": "technical",
+      "updated_at": "technical"
+    }
+  }
+}
