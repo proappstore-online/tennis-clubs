@@ -14,6 +14,7 @@ export type TelemetryEvent =
   | { name: 'write.refused'; action: string; target_type: string }
   | { name: 'page.load'; route: string; ttfb_ms: number; dcl_ms: number; load_ms: number }
   | { name: 'page.view'; route: string; render_ms: number }
+  | { name: 'page.error'; route: string; kind: 'render' }
 
 export type EventName = TelemetryEvent['name']
 
@@ -44,6 +45,7 @@ const SCHEMAS: Record<EventName, Record<string, Check>> = {
   'write.refused': { action: token, target_type: token },
   'page.load': { route: token, ttfb_ms: millis, dcl_ms: millis, load_ms: millis },
   'page.view': { route: token, render_ms: millis },
+  'page.error': { route: token, kind: oneOf('render') },
 }
 
 // Warnings are routine (a manager accepts them); a refusal or an anomaly is worth a look.
@@ -54,6 +56,7 @@ const LEVEL: Record<EventName, 'info' | 'warn'> = {
   'write.refused': 'warn',
   'page.load': 'info',
   'page.view': 'info',
+  'page.error': 'warn',
 }
 
 // Returns the event's data with only its schema fields, or null when the event is unknown or a field fails its check.

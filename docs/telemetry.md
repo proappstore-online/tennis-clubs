@@ -20,6 +20,7 @@ Status: in force. Issue #36 (slice 6 of #26). The code is in `web/src/telemetry/
 | `write.refused` | warn | `action` (the server action name), `target_type` | Any audited write is refused: the server changed no rows (`recordAudit`). This covers role checks and state checks alike. |
 | `page.load` | info | `route`, `ttfb_ms`, `dcl_ms`, `load_ms` | Once per document, after the load event. Times come from the Navigation Timing entry. |
 | `page.view` | info | `route`, `render_ms` | Each time a signed-in screen renders (`AuthenticatedApp`). |
+| `page.error` | warn | `route`, `kind` (`render`) | A page fails to render. The error boundary in `web/src/telemetry/boundary.tsx` reports it and shows a plain fallback. The message is never sent. |
 
 Route names are fixed: `comps`, `fixtures`, `fixture_import`, `rosters`, `documents`, `import_review`, `admin`, `join`, `sign_in`, and `other` for any unknown path. Invitation links are reported as `join`, so the invite code never leaves the browser.
 
@@ -27,7 +28,8 @@ Route names are fixed: `comps`, `fixtures`, `fixture_import`, `rosters`, `docume
 
 ## Errors and public pages
 
-- **Uncaught errors and rejected promises** on every page, including the sign-in screen, are captured automatically by the SDK's `app.logs` (`window.onerror` and `unhandledrejection`). The app adds no error event of its own, so there is no second copy.
+- **Render failures** on any page, including the sign-in screen, are reported as `page.error` by the app's error boundary. It sends the route and the kind, and never the error message.
+- **Uncaught errors and rejected promises** are captured automatically by the SDK's `app.logs` (`window.onerror` and `unhandledrejection`). They are not in this schema, so they are not counted twice.
 - **The sign-in screen** is the only public page. Its load timing is reported as `page.load` with route `sign_in`.
 
 ## Not covered
@@ -35,6 +37,10 @@ Route names are fixed: `comps`, `fixtures`, `fixture_import`, `rosters`, `docume
 - **Server-side events.** The worker and the `mcp.json` actions do not emit telemetry in this slice. The database already records imports, submissions and audits; those tables are the server-side record.
 - **Metrics aggregation.** Events are read from the platform log console. There is no dashboard or alerting here.
 - **Map and directory search timing.** No search exists yet (see `performance-budgets.md`).
+
+## Checks
+
+`tests/test_telemetry_schema.py` reads `web/src/telemetry/events.ts` and fails if an event that the issue lists is missing, if an event has no level or is absent from the public type, if a field is named like a person, a contact or a credential, or if a field uses a validator other than the fixed ones. Vitest checks the emitters and the redaction.
 
 ## Adding an event
 

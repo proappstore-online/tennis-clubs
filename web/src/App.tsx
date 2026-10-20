@@ -11,6 +11,7 @@ import ImportReview from './pages/ImportReview'
 import { outcomeOf } from './pages/auditTrail'
 import { applyPageMeta, SIGN_IN_META, signedInMeta, signedInTitle } from './seo'
 import { reportPageLoad, reportPageView, routeName } from './telemetry/pages'
+import { PageErrorBoundary } from './telemetry/boundary'
 
 const app = initPro({ appId: 'tennis-clubs' })
 export const NAV: NavItem[] = [{ label: 'Comps', href: '/', title: 'Comps — Tennis Clubs' }, { label: 'Fixtures', href: '/fixtures', title: 'Upcoming fixtures — Tennis Clubs' }, { label: 'Import', href: '/fixture-import', title: 'Import fixtures — Tennis Clubs' }, { label: 'Fixture rosters', href: '/rosters', title: 'Fixture rosters — Tennis Clubs' }, { label: 'Documents', href: '/documents', title: 'Documents — Tennis Clubs' }, { label: 'Import review', href: '/import-review', title: 'Import review — Tennis Clubs' }, { label: 'Club setup', href: '/admin', title: 'Club administration — Tennis Clubs' }]
@@ -23,7 +24,12 @@ const availabilityLabel = (value: Availability | null) => value === 'in' ? 'Play
 const statusLabel = (value: string) => ({ scheduled: 'Scheduled', washout: 'Washout', heat_out: 'Heat-out', forfeit: 'Forfeit', complete: 'Complete' }[value] ?? value)
 const stamp = (value: number) => new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value < 1e12 ? value * 1000 : value))
 
+// A render failure on any page is reported as page.error and replaced by a plain fallback (issue #30).
 export default function App() {
+  return <PageErrorBoundary logs={app.logs} route={() => routeName(window.location.pathname, NAV)}><AppRoutes /></PageErrorBoundary>
+}
+
+function AppRoutes() {
   const { user, loading, signOut } = useAuth(app)
   if (loading) return <main className="mx-auto max-w-xl px-4 py-16 text-center text-sm text-[var(--muted)]" role="status">Checking your sign-in…</main>
   if (!user) return <GoogleSignIn />
