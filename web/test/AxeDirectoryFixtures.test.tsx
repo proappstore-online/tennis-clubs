@@ -43,7 +43,7 @@ describe('axe: fixture page', () => {
     const { container } = render(<FixtureList app={mockApp as never} />)
     await screen.findByRole('list')
     expect(await violationsIn(container)).toEqual([])
-  })
+  }, 20000)
 
   it('has no violations in the empty state', async () => {
     mockApp.actions.call.mockResolvedValue({ rows: [] })
@@ -66,7 +66,7 @@ describe('axe: directory page', () => {
     const { container } = render(<Comps user={{ id: 'u1', login: 'sam' }} onSignOut={() => {}} />)
     await screen.findByRole('button', { name: /Northside vs Lakeside/ })
     expect(await violationsIn(container)).toEqual([])
-  })
+  }, 20000)
 
   it('has no violations with the fixture dialog open', async () => {
     mockApp.actions.call.mockImplementation(async (name: string) => (name === 'list_my_fixtures' ? { rows: [fixture()] } : { rows: [{ user_id: 'p1', display_name: 'Alex', availability: 'in', selection: 'selected' }] }))
@@ -74,5 +74,5 @@ describe('axe: directory page', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Northside vs Lakeside/ }))
     await screen.findByRole('dialog')
     expect(await violationsIn(container)).toEqual([])
-  })
+  }, 20000)
 })

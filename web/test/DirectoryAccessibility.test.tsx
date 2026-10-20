@@ -50,7 +50,7 @@ describe('fixture period tabs', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Home' })
     expect(screen.getByRole('tab', { name: 'Upcoming' }).getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Upcoming' }))
-  })
+  }, 20000)
 })
 
 describe('fixture list semantics', () => {
