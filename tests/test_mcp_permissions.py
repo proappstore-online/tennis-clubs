@@ -252,6 +252,21 @@ class McpPermissionTests(unittest.TestCase):
 
     def test_every_action_has_a_permission_case(self):
         covered = set(MANAGER_WRITES) | set(MANAGER_WRITE_DENIALS_ONLY) | {
+            # Competition archive: manager-only export, restore and log. Refusals for players, other clubs and foreign archives are tested in test_competition_archive.py.
+            "export_competition_archive",
+            "import_competition_archive",
+            "record_archive_run",
+            "restore_archive_divisions",
+            "restore_archive_external_club_aliases",
+            "restore_archive_external_clubs",
+            "restore_archive_fixture_roster",
+            "restore_archive_fixtures",
+            "restore_archive_result_submissions",
+            "restore_archive_roster_players",
+            "restore_archive_seasons",
+            "restore_archive_team_players",
+            "restore_archive_teams",
+            "restore_archive_venues",
             "set_my_fixture_availability", "log_my_fixture_availability_change", "accept_team_invite",
             "activate_invited_club_membership", "create_club", "bootstrap_club_admin", "can_create_first_club",
             "get_my_club_permissions", "get_club", "list_my_fixtures", "list_fixture_roster",
