@@ -75,6 +75,27 @@ class FirstClubOnboardingTests(unittest.TestCase):
         self.assertIsNone(self.db.execute("SELECT 1 FROM organizations WHERE id='denied-club'").fetchone())
         self.assertIsNone(self.db.execute("SELECT 1 FROM club_memberships WHERE id='forged-admin'").fetchone())
 
+    def test_account_whose_prior_club_membership_is_inactive_cannot_create_a_duplicate(self):
+        # The club this account set up still exists, but its membership was switched off: no active access, no setup offer.
+        self.db.executescript("""
+            INSERT INTO organizations(id,name,slug,created_at,created_by) VALUES('former','Former Club','former',1,'former-user');
+            INSERT INTO club_memberships(id,org_id,user_id,role,display_name,is_active,created_at) VALUES('former-m','former','former-user','admin','Former',0,1);
+        """)
+        eligible = TOOLS["can_create_first_club"]
+        self.assertIsNone(self.db.execute(eligible["sql"], {"__user_id": "former-user"}).fetchone())
+        self.db.execute(TOOLS["create_club"]["sql"], {"__user_id": "former-user", "__now": 10, "id": "duplicate", "name": "Duplicate", "slug": "duplicate"})
+        self.db.execute(TOOLS["bootstrap_club_admin"]["sql"], {"__user_id": "former-user", "__now": 10, "id": "re-admin", "org_id": "former", "display_name": "Former"})
+        self.assertIsNone(self.db.execute("SELECT 1 FROM organizations WHERE id='duplicate'").fetchone())
+        self.assertEqual(self.db.execute("SELECT is_active FROM club_memberships WHERE id='former-m'").fetchone()[0], 0)
+        self.assertIsNone(self.db.execute("SELECT 1 FROM club_memberships WHERE id='re-admin'").fetchone())
+
+    def test_creator_whose_club_has_no_membership_is_pointed_to_that_club_not_a_second_one(self):
+        self.db.executescript("INSERT INTO organizations(id,name,slug,created_at,created_by) VALUES('pending','Pending Club','pending',1,'pending-user');")
+        row = self.db.execute(TOOLS["can_create_first_club"]["sql"], {"__user_id": "pending-user"}).fetchone()
+        self.assertEqual(tuple(row), (0, "pending", "Pending Club"))
+        self.db.execute(TOOLS["create_club"]["sql"], {"__user_id": "pending-user", "__now": 10, "id": "second", "name": "Second", "slug": "second"})
+        self.assertIsNone(self.db.execute("SELECT 1 FROM organizations WHERE id='second'").fetchone())
+
     def test_partial_create_survives_reload_and_creator_can_retry_bootstrap(self):
         create = TOOLS["create_club"]
         bootstrap = TOOLS["bootstrap_club_admin"]
