@@ -39,4 +39,19 @@ describe('team invite acceptance', () => {
     expect(mockApp.invites.redeem).toHaveBeenCalledTimes(1)
     expect(mockApp.actions.call).toHaveBeenCalledWith('accept_team_invite', { claim_token: 'tok-1', display_name: 'player' })
   })
+  it('tells the member a link without a team membership needs a fresh link, in Tennis Clubs wording', async () => {
+    mockApp.invites.redeem.mockResolvedValue({ metadata: {} })
+    render(<App />)
+    const message = await screen.findByText('This invite link does not include a team membership. Ask the club for a fresh link.')
+    expect(message).toBeTruthy()
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('accept_team_invite', expect.anything())
+  })
+
+  it('shows Tennis Clubs wording for an expired or used link and never shows the raw SDK error', async () => {
+    mockApp.invites.redeem.mockRejectedValue(new Error('PAS delegated invite group member limit reached (internal)'))
+    render(<App />)
+    const message = await screen.findByText('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')
+    expect(message.textContent).not.toMatch(/PAS|delegat|internal|platform|group/i)
+    expect(document.body.textContent).not.toMatch(/PAS delegated|member limit reached/)
+  })
 })
