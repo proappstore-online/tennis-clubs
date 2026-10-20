@@ -157,6 +157,18 @@ describe('real ClubAdmin first-club onboarding', () => {
     await waitFor(() => expect(mockApp.actions.call).toHaveBeenCalledWith('create_club', expect.objectContaining({ name: 'Deliberate Club' })))
   })
 
+  it('does not create a club when the form is submitted without the acknowledgement, even if browser validation is skipped', async () => {
+    renderClubAdmin()
+    await screen.findByRole('heading', { name: 'Create a new club' })
+    const nameField = screen.getByRole('textbox', { name: 'Club name' })
+    fireEvent.change(nameField, { target: { value: 'Unconfirmed Club' } })
+    fireEvent.submit(nameField.closest('form')!)
+
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('create_club', expect.anything())
+    expect((await screen.findByRole('alert')).textContent).toContain('Confirm that you are starting a new club')
+    expect(mockStore.clubs).toEqual([])
+  })
+
   it('shows a failed create request, then permits retry without creating duplicates', async () => {
     mockStore.failNextCreate = true
     renderClubAdmin()

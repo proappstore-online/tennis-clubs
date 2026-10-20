@@ -95,6 +95,8 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     event.preventDefault()
     const form = new FormData(event.currentTarget); const name = String(form.get('club_name') ?? '').trim()
     if (!name) return
+    // The acknowledgement is required in code, not only by the browser: a new club must never be created by accident (issue #13).
+    if (!form.get('confirm_new_club')) { setError('Confirm that you are starting a new club, not restoring access to an existing club, before creating it.'); return }
     const orgId = id(); const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${orgId.slice(0, 6)}`
     setBusy(true); setError(''); setMessage('')
     try {
