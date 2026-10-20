@@ -7,13 +7,18 @@ on:
     branches: [main]
 
 jobs:
+  # Runner routing (see CLAUDE.md "CI runner rules"). Public repo: the router job
+  # and every job below run on ubuntu-latest; no billing check, no secret read.
+  # Private repo: GitHub-hosted while included minutes remain, self-hosted pags
+  # once they are spent, using the repo-level RUNNER_BILLING_TOKEN (never an org
+  # secret). No job sets its own runner label.
   router:
-    uses: serge-ivo/runner-router/.github/workflows/router.yml@v1
+    uses: ProAgentStore/runner-router/.github/workflows/router.yml@v1
     with:
       included-minutes: 2000
       self-hosted-labels: self-hosted,pags
     secrets:
-      billing-token: ${{ secrets.ORG_BILLING_TOKEN }}
+      billing-token: ${{ secrets.RUNNER_BILLING_TOKEN }}
 
   compliance:
     needs: router
