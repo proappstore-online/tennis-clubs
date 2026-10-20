@@ -9,21 +9,24 @@ These apply to **every repository in the proappstore-online org**: the template,
 from it, and any repo added later.
 
 - **Public repos always build on GitHub-hosted runners** (`ubuntu-latest`, unlimited free
-  minutes) and must **never** use self-hosted runners.
-- **Private repos go through the billing-aware router** (`ProAgentStore/runner-router@v1`):
-  GitHub-hosted while the org's included Actions minutes remain, self-hosted `pags` runners only
-  once they are spent (or when the billing check fails).
-- **No org-level secrets, ever.** On the free plan they are readable by public repos.
-- **The billing token is a repo-level secret (`RUNNER_BILLING_TOKEN`) on private repos only.**
-  Public repos have no billing token.
+  minutes) and must **never** use self-hosted runners. The router returns `["ubuntu-latest"]`
+  unless `github.event.repository.private` is `true`, and for a public repo it runs no billing
+  check and reads no secret.
+- **Private repos go through the billing-aware router.** It checks the org's included Actions
+  minutes with the repo-level secret `RUNNER_BILLING_TOKEN`. GitHub-hosted runners first;
+  self-hosted `pags` runners only once the included minutes are exhausted (or when the check
+  fails, including when the secret is missing).
+- **No org-level secrets, ever.** On the free GitHub plan, org secrets are readable by public
+  repos. The billing token is a repo-level secret on private repos only, never an org secret.
 - **The self-hosted runner group stays private-only.** Never allow public repositories on it.
+- **Router reference:** `ProAgentStore/runner-router/.github/workflows/router.yml@v1`, not
+  `serge-ivo/runner-router`.
 
 How the workflows follow this: every workflow starts with a `router` job calling
 `ProAgentStore/runner-router/.github/workflows/router.yml@v1`, and every other job declares
-`needs: router` and `runs-on: ${{ fromJSON(needs.router.outputs.runner) }}`. On a public repo the
-router job itself runs on `ubuntu-latest` and returns `["ubuntu-latest"]` without a billing check
-or reading any secret. Never hard-code a runner label (`ubuntu-latest`, `self-hosted`, anything
-else) on a job, and never add a job that skips the router.
+`needs: router` and `runs-on: ${{ fromJSON(needs.router.outputs.runner) }}`. Never hard-code a
+runner label (`ubuntu-latest`, `self-hosted`, anything else) on a job, and never add a job that
+skips the router.
 
 Background, in plain English: README, "CI" section. Router behaviour and tests:
 https://github.com/ProAgentStore/runner-router.

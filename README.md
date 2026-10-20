@@ -52,8 +52,9 @@ The club administrative integration surface is documented in `docs/mcp-contract.
 ## CI
 
 Every workflow begins with a `router` job that calls
-[`ProAgentStore/runner-router`](https://github.com/ProAgentStore/runner-router), and every other
-job runs wherever the router says. Which runner that is depends on whether the repo is public.
+[`ProAgentStore/runner-router`](https://github.com/ProAgentStore/runner-router)
+(`.github/workflows/router.yml@v1`), and every other job runs wherever the router says. Which
+runner that is depends on whether the repo is public.
 
 **Public repos build on GitHub's own runners, always.** GitHub gives public repos unlimited free
 minutes on `ubuntu-latest`, so there is nothing to save, and a public repo must never run on our
@@ -61,7 +62,7 @@ self-hosted machines: anyone can open a pull request against it, and that would 
 our hardware. The router sees the repo is public, runs itself on `ubuntu-latest`, and sends every
 job there. It does not check billing and does not read any secret.
 
-**Private repos use GitHub's runners until the month's free minutes run out.** The router reads
+**Private repos use GitHub's runners until the month's included minutes run out.** The router reads
 the org's Actions usage. While included minutes remain, jobs run on `ubuntu-latest`. Once they are
 spent, or if the usage check fails for any reason, jobs move to the self-hosted `pags` runners so
 the pipeline keeps going.
