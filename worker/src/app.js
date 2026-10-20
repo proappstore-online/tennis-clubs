@@ -11,6 +11,19 @@ const ROUTE = /^\/documents\/([A-Za-z0-9_-]{1,80})\/(download|upload)$/
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
+// Competition-draw import (issue #1). The route runs the dry run and the apply steps of mcp.json; the whole write is
+// one PAS batch, which is one transaction, so a failed step leaves nothing behind.
+const DRAW_PATH = '/draw/import'
+const MAX_DRAW_BYTES = 2 * 1024 * 1024
+const DRAW_APPLY_STEPS = [
+  'apply_draw_seasons', 'apply_draw_divisions', 'apply_draw_venues', 'apply_draw_external_clubs',
+  'apply_draw_external_aliases', 'apply_draw_placeholders', 'apply_draw_teams', 'apply_draw_fixtures',
+  'apply_draw_roster', 'apply_draw_venue_updates', 'apply_draw_fixture_updates', 'apply_draw_provenance',
+]
+const OUTCOMES = ['created', 'updated', 'skipped', 'conflicted', 'failed']
+// Roster players and external opponent names are personal or identifying, so the report refers to them by position only.
+const REDACTED_ENTITIES = new Set(['roster', 'external_alias'])
+
 function plain(status, message) {
   return new Response(message, { status, headers: NO_STORE })
 }
@@ -54,6 +67,7 @@ function userClient(env, invocation, caller) {
   const ctx = { token: env.PAS_WORKER_TOKEN ?? '', invocation, as: caller }
   return {
     call: (name, params) => pas.actions.call(name, params, ctx),
+    batch: (calls) => pas.actions.batch(calls, ctx),
     storage: pas.storage,
     workerCtx: { token: env.PAS_WORKER_TOKEN ?? '', invocation },
     env,
@@ -112,6 +126,79 @@ async function upload(client, orgId, documentId, payload) {
   return Response.json({ status: 'stored', sha256: digest }, { status: 201, headers: NO_STORE })
 }
 
+function drawJson(status, body) {
+  return Response.json(body, { status, headers: NO_STORE })
+}
+
+function drawCounts(rows) {
+  const counts = Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]))
+  for (const row of rows) if (row.outcome in counts) counts[row.outcome] += 1
+  return counts
+}
+
+// One entry per planned record, in plan order. Roster and alias names are never reported.
+function drawRecords(rows) {
+  return rows.map((row, position) => ({
+    position,
+    entity_type: row.entity_type,
+    source_key: REDACTED_ENTITIES.has(row.entity_type) ? null : row.source_key,
+    action: row.action,
+    severity: row.severity,
+    outcome: row.outcome,
+    ...(row.severity === 'blocking' ? { code: row.message } : {}),
+  }))
+}
+
+// changes is the number of rows one apply step wrote (PAS execute results carry it).
+function changesOf(result) {
+  return result?.changes ?? result?.meta?.changes ?? null
+}
+
+async function drawImport(client, payload, orgId, caller, dryRun) {
+  if (String(payload.method ?? 'GET').toUpperCase() !== 'POST') return plain(405, 'method not allowed')
+  const bytes = requestBytes(payload)
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_DRAW_BYTES) return plain(413, 'the draw payload is empty or too large')
+  const text = new TextDecoder().decode(bytes)
+  let draw
+  try {
+    draw = JSON.parse(text)
+  } catch {
+    return drawJson(400, { status: 'rejected', errors: [{ code: 'invalid_json' }] })
+  }
+  const digest = await sha256Hex(bytes)
+  // The dry run returns no rows to a caller who is not an administrator of the club (the SQL gate), so nothing is planned.
+  const rows = (await client.call('import_competition_draw', { org_id: orgId, payload: text }))?.rows ?? []
+  if (rows.length === 0) return drawJson(403, { status: 'forbidden', errors: [{ code: 'not_club_administrator' }] })
+  const blocking = rows.filter((row) => row.severity === 'blocking')
+  const base = {
+    importer: caller?.user_id ?? null,
+    import_time: new Date().toISOString(),
+    source: { system: draw?.source_system ?? null, run: draw?.source_run ?? null, payload_sha256: digest },
+    planned: drawCounts(rows),
+    records: drawRecords(rows),
+  }
+  if (dryRun) return drawJson(200, { ...base, status: 'dry_run', valid: blocking.length === 0, counts: drawCounts([]) })
+  // Any blocking row means the apply steps would write nothing, so the import is refused before the batch starts.
+  if (blocking.length > 0) {
+    return drawJson(422, { ...base, status: 'rejected', valid: false, counts: drawCounts([]), errors: drawRecords(blocking).map(({ entity_type, source_key, code }) => ({ entity_type, source_key, code })) })
+  }
+  const runId = crypto.randomUUID()
+  const calls = [
+    { name: 'record_draw_import_run', params: { org_id: orgId, import_run_id: runId, source_system: base.source.system, source_run: base.source.run, payload_sha256: digest } },
+    ...DRAW_APPLY_STEPS.map((name) => ({ name, params: { org_id: orgId, payload: text, ...(name === 'apply_draw_provenance' ? { import_run_id: runId } : {}) } })),
+    { name: 'record_draw_import_outcomes', params: { org_id: orgId, import_run_id: runId, outcomes: JSON.stringify(rows) } },
+  ]
+  let results
+  try {
+    results = await client.batch(calls)
+  } catch {
+    // The batch rolled back as a whole: no run, no records, no provenance. The cause is not returned to the caller.
+    return drawJson(500, { ...base, status: 'rolled_back', valid: true, counts: drawCounts([]), import_run_id: runId, errors: [{ code: 'transaction_failed' }] })
+  }
+  const steps = Object.fromEntries(results.map((step) => [step.name, changesOf(step.results?.[0])]))
+  return drawJson(201, { ...base, status: 'imported', valid: true, counts: drawCounts(rows), import_run_id: runId, steps })
+}
+
 export default {
   async fetch(request, env) {
     let envelope
@@ -126,6 +213,12 @@ export default {
     const path = String(payload.path ?? '/')
     const query = new URLSearchParams(typeof payload.query === 'string' ? payload.query : '')
     if (envelope.caller === undefined || envelope.caller === null) return plain(401, 'sign in to use documents')
+    if (path === DRAW_PATH) {
+      const orgId = query.get('org') ?? ''
+      if (!SAFE_ID.test(orgId)) return plain(404, 'not found')
+      const client = userClient(env, `${envelope.id}:${envelope.attempt ?? 1}`, envelope.caller)
+      return drawImport(client, payload, orgId, envelope.caller, query.get('dry_run') === 'true')
+    }
     const match = ROUTE.exec(path)
     const orgId = query.get('org') ?? ''
     if (!match || !SAFE_ID.test(orgId)) return plain(404, 'not found')
