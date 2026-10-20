@@ -181,6 +181,20 @@ The action catalog is shown to club administrators on the Club setup screen (gen
 | `list_document_access_log` | query | `admin`, `convenor`, `manager` | manager | read-only | no | yes | no |
 | `list_my_clubs` | query | `member` | member | read-only | no | yes | yes |
 | `check_document_upload` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
+| `export_competition_archive` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
+| `import_competition_archive` | query | `admin`, `convenor`, `manager` | manager | read-only | no | no | no |
+| `restore_archive_seasons` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_divisions` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_venues` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_external_clubs` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_external_club_aliases` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_teams` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_team_players` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_fixtures` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_fixture_roster` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_roster_players` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `restore_archive_result_submissions` | execute | `admin`, `convenor`, `manager` | manager | idempotent | yes | no | no |
+| `record_archive_run` | execute | `admin`, `convenor`, `manager` | manager | append-only | no | no | no |
 
 ### `list_my_fixtures`
 
@@ -873,7 +887,7 @@ Record a managed write (succeeded or refused) in the club audit trail; the actor
 | --- | --- |
 | `id` | string |
 | `org_id` | string |
-| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `record_import_run_issues`, `register_document`, `remove_fixture_roster_player`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
+| `action` | string; one of `add_external_club_alias`, `add_fixture_roster_player`, `apply_draw_divisions`, `apply_draw_external_aliases`, `apply_draw_external_clubs`, `apply_draw_fixture_updates`, `apply_draw_fixtures`, `apply_draw_placeholders`, `apply_draw_provenance`, `apply_draw_roster`, `apply_draw_seasons`, `apply_draw_teams`, `apply_draw_venue_updates`, `apply_draw_venues`, `apply_fixture_result_to_fixture`, `approve_fixture_review`, `bootstrap_club_admin`, `change_document_visibility`, `create_division`, `create_external_club`, `create_external_club_placeholder`, `create_season`, `create_team`, `create_team_invite`, `create_venue`, `deactivate_team_player`, `delete_contact_detail`, `mark_document_stored`, `reconcile_imported_fixture_time`, `record_draw_import_outcomes`, `record_draw_import_run`, `record_import_run_issues`, `register_document`, `remove_fixture_roster_player`, `restore_archive_divisions`, `restore_archive_external_club_aliases`, `restore_archive_external_clubs`, `restore_archive_fixture_roster`, `restore_archive_fixtures`, `restore_archive_result_submissions`, `restore_archive_roster_players`, `restore_archive_seasons`, `restore_archive_team_players`, `restore_archive_teams`, `restore_archive_venues`, `schedule_fixture`, `set_contact_detail`, `set_external_club_home_venue`, `set_team_player_pool`, `set_venue_shared`, `submit_fixture_result`, `update_document_details`, `update_fixture_match_day`, `update_venue`, `upsert_imported_fixture`, `upsert_imported_roster_player`, `withdraw_document` |
 | `target_type` | string |
 | `target_id` | string; default null |
 | `outcome` | string; one of `succeeded`, `refused` |
@@ -1723,3 +1737,213 @@ Authorise storing a registered document's file: returns the registered size, typ
 | `document_id` | string |
 
 Returns: `id`, `content_type`, `byte_size`, `sha256`
+
+### `export_competition_archive`
+
+Export one club’s competition records as a re-importable JSON archive: seasons, divisions, venues, external clubs and aliases, teams and squads, fixtures, fixture rosters and roster players, and every result submission. Player names are included. Contact details, scorecards and import provenance are not.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+
+Returns: `archive`, `exported_at`
+
+### `import_competition_archive`
+
+Check a competition archive against a club before restoring it: whether it is valid for this club, and per section how many records it holds and how many are not yet present. Writes nothing; the restore_archive_* steps write the missing records in order.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: read-only. Audit: not required.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `format_version`, `valid`, `seasons_in_archive`, `seasons_to_restore`, `divisions_in_archive`, `divisions_to_restore`, `venues_in_archive`, `venues_to_restore`, `external_clubs_in_archive`, `external_clubs_to_restore`, `external_club_aliases_in_archive`, `external_club_aliases_to_restore`, `teams_in_archive`, `teams_to_restore`, `team_players_in_archive`, `team_players_to_restore`, `fixtures_in_archive`, `fixtures_to_restore`, `fixture_roster_in_archive`, `fixture_roster_to_restore`, `roster_players_in_archive`, `roster_players_to_restore`, `fixture_result_submissions_in_archive`, `fixture_result_submissions_to_restore`
+
+### `restore_archive_seasons`
+
+Restore the seasons from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_divisions`
+
+Restore the divisions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_venues`
+
+Restore the venues from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_external_clubs`
+
+Restore the external clubs from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_external_club_aliases`
+
+Restore the external club aliases from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_teams`
+
+Restore the teams from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_team_players`
+
+Restore the team players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_fixtures`
+
+Restore the fixtures from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_fixture_roster`
+
+Restore the fixture roster from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_roster_players`
+
+Restore the roster players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `restore_archive_result_submissions`
+
+Restore the fixture result submissions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: idempotent. Audit: record with `record_audit_event`.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `archive` | string |
+
+Returns: `changes`: rows written; 0 means not applied.
+
+### `record_archive_run`
+
+Record a competition archive export or import in the archive run log, with its row counts.
+
+- Access: club-manager; roles: admin, convenor, manager; audience: manager.
+- Idempotency: append-only. Audit: not required.
+- Withheld fields: `convenor_phone`, `scorecard_path`, `scorecard_user_id`.
+
+| Parameter | Constraints |
+| --- | --- |
+| `org_id` | string |
+| `direction` | string; one of `export`, `import` |
+| `row_counts` | string |
+
+Returns: `changes`: rows written; 0 means not applied.

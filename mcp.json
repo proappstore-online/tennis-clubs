@@ -1642,7 +1642,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'record_import_run_issues', 'register_document', 'remove_fixture_roster_player', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'record_import_run_issues', 'register_document', 'remove_fixture_roster_player', 'restore_archive_divisions', 'restore_archive_external_club_aliases', 'restore_archive_external_clubs', 'restore_archive_fixture_roster', 'restore_archive_fixtures', 'restore_archive_result_submissions', 'restore_archive_roster_players', 'restore_archive_seasons', 'restore_archive_team_players', 'restore_archive_teams', 'restore_archive_venues', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1687,6 +1687,17 @@
             "record_import_run_issues",
             "register_document",
             "remove_fixture_roster_player",
+            "restore_archive_divisions",
+            "restore_archive_external_club_aliases",
+            "restore_archive_external_clubs",
+            "restore_archive_fixture_roster",
+            "restore_archive_fixtures",
+            "restore_archive_result_submissions",
+            "restore_archive_roster_players",
+            "restore_archive_seasons",
+            "restore_archive_team_players",
+            "restore_archive_teams",
+            "restore_archive_venues",
             "schedule_fixture",
             "set_contact_detail",
             "set_external_club_home_venue",
@@ -3772,6 +3783,485 @@
         "paging": false,
         "versioned": false,
         "redacts": []
+      }
+    },
+    {
+      "name": "export_competition_archive",
+      "description": "Export one club’s competition records as a re-importable JSON archive: seasons, divisions, venues, external clubs and aliases, teams and squads, fixtures, fixture rosters and roster players, and every result submission. Player names are included. Contact details, scorecards and import provenance are not.",
+      "operation": "query",
+      "sql": "SELECT json_object('format','tennis-clubs-competition-archive','format_version',1,'exported_at',strftime('%Y-%m-%dT%H:%M:%SZ','now'),'organization',json_object('id',o.id,'name',o.name,'slug',o.slug),'seasons',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',s.id,'org_id',s.org_id,'name',s.name,'starts_on',s.starts_on,'ends_on',s.ends_on,'status',s.status,'created_at',s.created_at) AS x FROM seasons s WHERE s.org_id=o.id ORDER BY s.id)),'divisions',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',d.id,'season_id',d.season_id,'name',d.name,'format',d.format,'created_at',d.created_at) AS x FROM divisions d WHERE d.season_id IN (SELECT id FROM seasons WHERE org_id=o.id) ORDER BY d.id)),'venues',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',v.id,'org_id',v.org_id,'name',v.name,'address',v.address,'map_url',v.map_url,'notes',CASE WHEN (v.notes GLOB '*@*' OR replace(replace(replace(replace(replace(replace(v.notes,' ',''),'-',''),'.',''),'/',''),'(',''),')','') GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE v.notes END,'shared',v.shared,'created_at',v.created_at,'updated_at',v.updated_at) AS x FROM venues v WHERE v.org_id=o.id ORDER BY v.id)),'external_clubs',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',ec.id,'org_id',ec.org_id,'canonical_name',ec.canonical_name,'normalized_name',ec.normalized_name,'home_venue_id',ec.home_venue_id,'created_at',ec.created_at,'updated_at',ec.updated_at) AS x FROM external_clubs ec WHERE ec.org_id=o.id ORDER BY ec.id)),'external_club_aliases',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',a.id,'org_id',a.org_id,'external_club_id',a.external_club_id,'alias',a.alias,'normalized_alias',a.normalized_alias,'created_at',a.created_at) AS x FROM external_club_aliases a WHERE a.org_id=o.id ORDER BY a.id)),'teams',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',t.id,'org_id',t.org_id,'division_id',t.division_id,'name',t.name,'colour',t.colour,'external_club_id',t.external_club_id,'is_external',t.is_external,'created_at',t.created_at) AS x FROM teams t WHERE t.org_id=o.id ORDER BY t.id)),'team_players',(SELECT json_group_array(json(x)) FROM (SELECT json_object('team_id',tp.team_id,'user_id',tp.user_id,'display_name',tp.display_name,'is_active',tp.is_active,'pool',tp.pool,'updated_at',tp.updated_at) AS x FROM team_players tp WHERE tp.team_id IN (SELECT id FROM teams WHERE org_id=o.id) ORDER BY tp.team_id, tp.user_id)),'fixtures',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',f.id,'org_id',f.org_id,'division_id',f.division_id,'home_team_id',f.home_team_id,'away_team_id',f.away_team_id,'venue_id',f.venue_id,'starts_at',f.starts_at,'round_label',f.round_label,'status',f.status,'home_score',f.home_score,'away_score',f.away_score,'notes',CASE WHEN (f.notes GLOB '*@*' OR replace(replace(replace(replace(replace(replace(f.notes,' ',''),'-',''),'.',''),'/',''),'(',''),')','') GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE f.notes END,'status_updated_at',f.status_updated_at,'match_notice',CASE WHEN (f.match_notice GLOB '*@*' OR replace(replace(replace(replace(replace(replace(f.match_notice,' ',''),'-',''),'.',''),'/',''),'(',''),')','') GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE f.match_notice END,'time_status',f.time_status,'arrival_at',f.arrival_at,'review_status',f.review_status,'reviewed_at',f.reviewed_at,'created_at',f.created_at,'updated_at',f.updated_at) AS x FROM fixtures f WHERE f.org_id=o.id ORDER BY f.id)),'fixture_roster',(SELECT json_group_array(json(x)) FROM (SELECT json_object('fixture_id',fr.fixture_id,'user_id',fr.user_id,'display_name',fr.display_name,'availability',fr.availability,'confirmed_at',fr.confirmed_at,'selection',fr.selection,'pool',fr.pool) AS x FROM fixture_roster fr WHERE fr.fixture_id IN (SELECT id FROM fixtures WHERE org_id=o.id) ORDER BY fr.fixture_id, fr.user_id)),'roster_players',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',rp.id,'fixture_id',rp.fixture_id,'player_name',rp.player_name,'availability',rp.availability,'created_at',rp.created_at) AS x FROM roster_players rp WHERE rp.fixture_id IN (SELECT id FROM fixtures WHERE org_id=o.id) ORDER BY rp.id)),'fixture_result_submissions',(SELECT json_group_array(json(x)) FROM (SELECT json_object('id',r.id,'fixture_id',r.fixture_id,'submitted_by',r.submitted_by,'home_score',r.home_score,'away_score',r.away_score,'set_results',r.set_results,'correction_note',CASE WHEN (r.correction_note GLOB '*@*' OR replace(replace(replace(replace(replace(replace(r.correction_note,' ',''),'-',''),'.',''),'/',''),'(',''),')','') GLOB '*[0-9][0-9][0-9][0-9][0-9][0-9][0-9]*') THEN NULL ELSE r.correction_note END,'submitted_at',r.submitted_at) AS x FROM fixture_result_submissions r WHERE r.fixture_id IN (SELECT id FROM fixtures WHERE org_id=o.id) ORDER BY r.submitted_at, r.id))) AS archive,strftime('%Y-%m-%dT%H:%M:%SZ','now') AS exported_at FROM organizations o WHERE o.id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "import_competition_archive",
+      "description": "Check a competition archive against a club before restoring it: whether it is valid for this club, and per section how many records it holds and how many are not yet present. Writes nothing; the restore_archive_* steps write the missing records in order.",
+      "operation": "query",
+      "sql": "SELECT json_extract(:archive,'$.format_version') AS format_version,(json_extract(:archive,'$.format_version')=1 AND json_extract(:archive,'$.organization.id')=:org_id) AS valid,(SELECT COUNT(*) FROM json_each(:archive,'$.seasons') j) AS seasons_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.seasons') j WHERE NOT EXISTS (SELECT 1 FROM seasons x WHERE x.id=json_extract(j.value,'$.id'))) AS seasons_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.divisions') j) AS divisions_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.divisions') j WHERE NOT EXISTS (SELECT 1 FROM divisions x WHERE x.id=json_extract(j.value,'$.id'))) AS divisions_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.venues') j) AS venues_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.venues') j WHERE NOT EXISTS (SELECT 1 FROM venues x WHERE x.id=json_extract(j.value,'$.id'))) AS venues_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.external_clubs') j) AS external_clubs_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.external_clubs') j WHERE NOT EXISTS (SELECT 1 FROM external_clubs x WHERE x.id=json_extract(j.value,'$.id'))) AS external_clubs_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.external_club_aliases') j) AS external_club_aliases_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.external_club_aliases') j WHERE NOT EXISTS (SELECT 1 FROM external_club_aliases x WHERE x.id=json_extract(j.value,'$.id'))) AS external_club_aliases_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.teams') j) AS teams_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.teams') j WHERE NOT EXISTS (SELECT 1 FROM teams x WHERE x.id=json_extract(j.value,'$.id'))) AS teams_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.team_players') j) AS team_players_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.team_players') j WHERE NOT EXISTS (SELECT 1 FROM team_players x WHERE x.team_id=json_extract(j.value,'$.team_id') AND x.user_id=json_extract(j.value,'$.user_id'))) AS team_players_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.fixtures') j) AS fixtures_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.fixtures') j WHERE NOT EXISTS (SELECT 1 FROM fixtures x WHERE x.id=json_extract(j.value,'$.id'))) AS fixtures_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.fixture_roster') j) AS fixture_roster_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.fixture_roster') j WHERE NOT EXISTS (SELECT 1 FROM fixture_roster x WHERE x.fixture_id=json_extract(j.value,'$.fixture_id') AND x.user_id=json_extract(j.value,'$.user_id'))) AS fixture_roster_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.roster_players') j) AS roster_players_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.roster_players') j WHERE NOT EXISTS (SELECT 1 FROM roster_players x WHERE x.id=json_extract(j.value,'$.id'))) AS roster_players_to_restore,(SELECT COUNT(*) FROM json_each(:archive,'$.fixture_result_submissions') j) AS fixture_result_submissions_in_archive,(SELECT COUNT(*) FROM json_each(:archive,'$.fixture_result_submissions') j WHERE NOT EXISTS (SELECT 1 FROM fixture_result_submissions x WHERE x.id=json_extract(j.value,'$.id'))) AS fixture_result_submissions_to_restore FROM organizations o WHERE o.id=:org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_seasons",
+      "description": "Restore the seasons from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO seasons (id,org_id,name,starts_on,ends_on,status,created_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.name'),json_extract(j.value,'$.starts_on'),json_extract(j.value,'$.ends_on'),json_extract(j.value,'$.status'),json_extract(j.value,'$.created_at') FROM json_each(:archive,'$.seasons') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_divisions",
+      "description": "Restore the divisions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO divisions (id,season_id,name,format,created_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.season_id'),json_extract(j.value,'$.name'),json_extract(j.value,'$.format'),json_extract(j.value,'$.created_at') FROM json_each(:archive,'$.divisions') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.season_id') IN (SELECT id FROM seasons WHERE org_id=:org_id) AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_venues",
+      "description": "Restore the venues from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO venues (id,org_id,name,address,map_url,notes,shared,created_at,updated_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.name'),json_extract(j.value,'$.address'),json_extract(j.value,'$.map_url'),json_extract(j.value,'$.notes'),json_extract(j.value,'$.shared'),json_extract(j.value,'$.created_at'),json_extract(j.value,'$.updated_at') FROM json_each(:archive,'$.venues') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_external_clubs",
+      "description": "Restore the external clubs from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO external_clubs (id,org_id,canonical_name,normalized_name,home_venue_id,created_at,updated_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.canonical_name'),json_extract(j.value,'$.normalized_name'),json_extract(j.value,'$.home_venue_id'),json_extract(j.value,'$.created_at'),json_extract(j.value,'$.updated_at') FROM json_each(:archive,'$.external_clubs') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND (json_extract(j.value,'$.home_venue_id') IS NULL OR EXISTS (SELECT 1 FROM venues v WHERE v.id=json_extract(j.value,'$.home_venue_id') AND v.org_id=:org_id)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_external_club_aliases",
+      "description": "Restore the external club aliases from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO external_club_aliases (id,org_id,external_club_id,alias,normalized_alias,created_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.external_club_id'),json_extract(j.value,'$.alias'),json_extract(j.value,'$.normalized_alias'),json_extract(j.value,'$.created_at') FROM json_each(:archive,'$.external_club_aliases') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND EXISTS (SELECT 1 FROM external_clubs ec WHERE ec.id=json_extract(j.value,'$.external_club_id') AND ec.org_id=:org_id) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_teams",
+      "description": "Restore the teams from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO teams (id,org_id,division_id,name,colour,external_club_id,is_external,created_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.division_id'),json_extract(j.value,'$.name'),json_extract(j.value,'$.colour'),json_extract(j.value,'$.external_club_id'),json_extract(j.value,'$.is_external'),json_extract(j.value,'$.created_at') FROM json_each(:archive,'$.teams') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND (json_extract(j.value,'$.division_id') IS NULL OR EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=json_extract(j.value,'$.division_id') AND s.org_id=:org_id)) AND (json_extract(j.value,'$.external_club_id') IS NULL OR EXISTS (SELECT 1 FROM external_clubs ec WHERE ec.id=json_extract(j.value,'$.external_club_id') AND ec.org_id=:org_id)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_team_players",
+      "description": "Restore the team players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO team_players (team_id,user_id,display_name,is_active,pool,updated_at) SELECT json_extract(j.value,'$.team_id'),json_extract(j.value,'$.user_id'),json_extract(j.value,'$.display_name'),json_extract(j.value,'$.is_active'),json_extract(j.value,'$.pool'),json_extract(j.value,'$.updated_at') FROM json_each(:archive,'$.team_players') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.team_id') IN (SELECT id FROM teams WHERE org_id=:org_id) AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(team_id, user_id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_fixtures",
+      "description": "Restore the fixtures from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO fixtures (id,org_id,division_id,home_team_id,away_team_id,venue_id,starts_at,round_label,status,home_score,away_score,notes,status_updated_at,match_notice,time_status,arrival_at,review_status,reviewed_at,created_at,updated_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.org_id'),json_extract(j.value,'$.division_id'),json_extract(j.value,'$.home_team_id'),json_extract(j.value,'$.away_team_id'),json_extract(j.value,'$.venue_id'),json_extract(j.value,'$.starts_at'),json_extract(j.value,'$.round_label'),json_extract(j.value,'$.status'),json_extract(j.value,'$.home_score'),json_extract(j.value,'$.away_score'),json_extract(j.value,'$.notes'),json_extract(j.value,'$.status_updated_at'),json_extract(j.value,'$.match_notice'),json_extract(j.value,'$.time_status'),json_extract(j.value,'$.arrival_at'),json_extract(j.value,'$.review_status'),json_extract(j.value,'$.reviewed_at'),json_extract(j.value,'$.created_at'),json_extract(j.value,'$.updated_at') FROM json_each(:archive,'$.fixtures') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.org_id')=:org_id AND EXISTS (SELECT 1 FROM teams t WHERE t.id=json_extract(j.value,'$.home_team_id') AND t.org_id=:org_id) AND EXISTS (SELECT 1 FROM teams t WHERE t.id=json_extract(j.value,'$.away_team_id') AND t.org_id=:org_id) AND (json_extract(j.value,'$.division_id') IS NULL OR EXISTS (SELECT 1 FROM divisions d JOIN seasons s ON s.id=d.season_id WHERE d.id=json_extract(j.value,'$.division_id') AND s.org_id=:org_id)) AND (json_extract(j.value,'$.venue_id') IS NULL OR EXISTS (SELECT 1 FROM venues v WHERE v.id=json_extract(j.value,'$.venue_id') AND v.org_id=:org_id)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_fixture_roster",
+      "description": "Restore the fixture roster from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO fixture_roster (fixture_id,user_id,display_name,availability,confirmed_at,selection,pool) SELECT json_extract(j.value,'$.fixture_id'),json_extract(j.value,'$.user_id'),json_extract(j.value,'$.display_name'),json_extract(j.value,'$.availability'),json_extract(j.value,'$.confirmed_at'),json_extract(j.value,'$.selection'),json_extract(j.value,'$.pool') FROM json_each(:archive,'$.fixture_roster') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.fixture_id') IN (SELECT id FROM fixtures WHERE org_id=:org_id) AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(fixture_id, user_id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_roster_players",
+      "description": "Restore the roster players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO roster_players (id,fixture_id,player_name,availability,created_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.fixture_id'),json_extract(j.value,'$.player_name'),json_extract(j.value,'$.availability'),json_extract(j.value,'$.created_at') FROM json_each(:archive,'$.roster_players') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.fixture_id') IN (SELECT id FROM fixtures WHERE org_id=:org_id) AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "restore_archive_result_submissions",
+      "description": "Restore the fixture result submissions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+      "operation": "execute",
+      "sql": "INSERT INTO fixture_result_submissions (id,fixture_id,submitted_by,home_score,away_score,set_results,correction_note,submitted_at) SELECT json_extract(j.value,'$.id'),json_extract(j.value,'$.fixture_id'),json_extract(j.value,'$.submitted_by'),json_extract(j.value,'$.home_score'),json_extract(j.value,'$.away_score'),json_extract(j.value,'$.set_results'),json_extract(j.value,'$.correction_note'),json_extract(j.value,'$.submitted_at') FROM json_each(:archive,'$.fixture_result_submissions') j WHERE json_extract(:archive,'$.organization.id')=:org_id AND json_extract(j.value,'$.fixture_id') IN (SELECT id FROM fixtures WHERE org_id=:org_id) AND 1=1 AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager')) ON CONFLICT(id) DO NOTHING",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "archive": {
+          "type": "string",
+          "description": "The JSON archive produced by export_competition_archive"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
+      }
+    },
+    {
+      "name": "record_archive_run",
+      "description": "Record a competition archive export or import in the archive run log, with its row counts.",
+      "operation": "execute",
+      "sql": "INSERT INTO archive_run (direction,performed_by,row_counts) SELECT :direction,:__user_id,:row_counts WHERE EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "export",
+            "import"
+          ]
+        },
+        "row_counts": {
+          "type": "string",
+          "description": "JSON object of row counts by section"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "append-only",
+        "audit": false,
+        "paging": false,
+        "versioned": false,
+        "redacts": [
+          "convenor_phone",
+          "scorecard_path",
+          "scorecard_user_id"
+        ]
       }
     }
   ]

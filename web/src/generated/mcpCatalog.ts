@@ -1642,6 +1642,17 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "record_import_run_issues",
           "register_document",
           "remove_fixture_roster_player",
+          "restore_archive_divisions",
+          "restore_archive_external_club_aliases",
+          "restore_archive_external_clubs",
+          "restore_archive_fixture_roster",
+          "restore_archive_fixtures",
+          "restore_archive_result_submissions",
+          "restore_archive_roster_players",
+          "restore_archive_seasons",
+          "restore_archive_team_players",
+          "restore_archive_teams",
+          "restore_archive_venues",
           "schedule_fixture",
           "set_contact_detail",
           "set_external_club_home_venue",
@@ -3625,6 +3636,374 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       },
       {
         "name": "document_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "export_competition_archive",
+    "description": "Export one club’s competition records as a re-importable JSON archive: seasons, divisions, venues, external clubs and aliases, teams and squads, fixtures, fixture rosters and roster players, and every result submission. Player names are included. Contact details, scorecards and import provenance are not.",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "import_competition_archive",
+    "description": "Check a competition archive against a club before restoring it: whether it is valid for this club, and per section how many records it holds and how many are not yet present. Writes nothing; the restore_archive_* steps write the missing records in order.",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_seasons",
+    "description": "Restore the seasons from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_divisions",
+    "description": "Restore the divisions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_venues",
+    "description": "Restore the venues from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_external_clubs",
+    "description": "Restore the external clubs from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_external_club_aliases",
+    "description": "Restore the external club aliases from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_teams",
+    "description": "Restore the teams from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_team_players",
+    "description": "Restore the team players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_fixtures",
+    "description": "Restore the fixtures from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_fixture_roster",
+    "description": "Restore the fixture roster from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_roster_players",
+    "description": "Restore the roster players from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "restore_archive_result_submissions",
+    "description": "Restore the fixture result submissions from a competition archive that are not yet present for this club. Existing records are never changed. Run the restore steps in order, after checking the archive with import_competition_archive.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "archive",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "record_archive_run",
+    "description": "Record a competition archive export or import in the archive run log, with its row counts.",
+    "operation": "execute",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "append-only",
+    "audit": false,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "direction",
+        "type": "string",
+        "enum": [
+          "export",
+          "import"
+        ]
+      },
+      {
+        "name": "row_counts",
         "type": "string"
       }
     ]
