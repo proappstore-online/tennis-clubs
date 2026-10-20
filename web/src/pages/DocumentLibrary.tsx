@@ -16,6 +16,8 @@ export const visibilityLabel = (visibility: string) => ({
 
 const MANAGER_ROLES = ['admin', 'convenor', 'manager']
 const categoryLabel = (category: string) => category.charAt(0).toUpperCase() + category.slice(1)
+// The library loads this many documents at most; a notice says so when the club has more (issue #12).
+export const DOCUMENT_LIMIT = 100
 const noFilters: DocumentFilters = { seasonId: '', teamId: '' }
 const emptyForm = { title: '', description: '', source: '', effective: '', category: 'guidance', visibility: 'member' }
 
@@ -67,7 +69,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
     let active = true
     setDocumentsLoading(true)
     setError('')
-    app.actions.call<{ rows: Document[] }>('list_documents', category ? { org_id: clubId, category, limit: 100 } : { org_id: clubId, limit: 100 })
+    app.actions.call<{ rows: Document[] }>('list_documents', category ? { org_id: clubId, category, limit: DOCUMENT_LIMIT } : { org_id: clubId, limit: DOCUMENT_LIMIT })
       .then((result) => { if (active) setDocuments(result.rows ?? []) })
       .catch(() => { if (active) setError('Documents could not be loaded for this club.') })
       .finally(() => { if (active) setDocumentsLoading(false) })
@@ -181,6 +183,7 @@ export default function DocumentLibrary({ app }: { app: ProAppStore }) {
     </fieldset>}
     {documentsLoading && <p className="mt-5 text-sm text-[var(--muted)]" role="status">Loading documents…</p>}
     {!documentsLoading && clubs.length > 0 && visible.length === 0 && !error && <p className="mt-6 rounded-2xl border border-dashed border-[var(--line-strong)] p-6 text-sm text-[var(--muted)]">{filtered ? 'No documents match these filters.' : 'No documents are available to you in this club.'}</p>}
+    {documents.length >= DOCUMENT_LIMIT && <p role="status" className="mt-6 text-sm text-[var(--muted)]">Only the first {DOCUMENT_LIMIT} documents are loaded. Some documents may not be shown.</p>}
     <ul className="mt-6 grid gap-3">{visible.map((item) => <li key={item.id} className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm">
       <p className="text-sm font-semibold text-[var(--accent-deep)]">{categoryLabel(item.category)} · {visibilityLabel(item.visibility)}</p>
       <h2 className="mt-1 text-lg font-bold text-[var(--ink)]">{item.title}</h2>

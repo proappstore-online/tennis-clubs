@@ -11,6 +11,8 @@ type Option = { id: string; name: string }
 
 const MODES: [HistoryMode, string][] = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']]
 const STATUSES: [string, string][] = [['', 'All statuses'], ['scheduled', 'Scheduled'], ['complete', 'Complete'], ['washout', 'Washout'], ['heat_out', 'Heat out'], ['forfeit', 'Forfeit']]
+// The fixture list loads this many fixtures at most; a notice says when there are more (issue #12).
+export const FIXTURE_LIMIT = 50
 const field = 'min-h-11 w-full rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm text-[var(--ink)]'
 
 // Server parameters for one view. Upcoming and past split on `from` (today); the date range is separate.
@@ -18,7 +20,7 @@ export function historyParams(filters: HistoryFilters, now = new Date()) {
   return {
     from: fixtureListStart(now),
     mode: filters.mode,
-    limit: 50,
+    limit: FIXTURE_LIMIT,
     team_id: filters.teamId,
     season_id: filters.seasonId,
     result_status: filters.resultStatus,
@@ -97,6 +99,7 @@ export default function FixtureList({ app }: { app: ProAppStore }) {
 
     <div id="fixtures-panel" role="tabpanel" aria-labelledby={`fixtures-tab-${mode}`}>
     {error && <p role="alert" className="mt-5 rounded-xl bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger-ink)]">{error}</p>}
+    {!loading && fixtures.length >= FIXTURE_LIMIT && <p role="status" className="mt-5 text-sm text-[var(--muted)]">Only the first {FIXTURE_LIMIT} fixtures for this view are loaded. Narrow the filters to find others.</p>}
     {loading ? <p className="mt-5 text-sm text-[var(--muted)]" role="status">Loading fixtures…</p> : error ? null : fixtures.length === 0 ? <p className="mt-5 rounded-2xl border border-dashed border-[var(--line-strong)] p-8 text-center text-sm text-[var(--muted)]">{emptyMessage}</p> : <ul className="mt-5 grid list-none gap-3">{fixtures.map((fixture) => <li key={fixture.id}><article className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4 shadow-sm"><div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="font-bold text-[var(--ink)]">{fixture.home_team_name} <span className="font-medium text-[var(--muted)]">vs</span> {fixture.away_team_name}</h2><span className="text-xs font-semibold text-[var(--accent)]">{fixture.round_label ?? 'Fixture'}</span></div><p className="mt-2 text-sm text-[var(--muted)]">{fixtureStartLabel(fixture)}{fixtureArrivalLabel(fixture) ? ` · ${fixtureArrivalLabel(fixture)}` : ''} · {fixture.venue_name ?? 'Venue to be confirmed'}{fixture.venue_address ? ` · ${fixture.venue_address}` : ''}</p><p className="mt-1 text-xs text-[var(--muted)]">{fixture.home_team_name} is home</p>{completedScoreLabel(fixture) && <p className="mt-2 text-sm font-bold text-[var(--ink)]">Result: {completedScoreLabel(fixture)}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--accent-deep)]">Your team: {fixture.member_side === 'home' ? fixture.home_team_name : fixture.away_team_name}</p>}{fixture.member_side && <p className="mt-1 text-xs font-semibold text-[var(--muted)]">Opponent: {fixture.opponent_name ?? fixture.away_team_name}{fixture.is_external_opponent ? ' (external club)' : ''}</p>}</article></li>)}</ul>}
     </div>
   </main>

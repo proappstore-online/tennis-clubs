@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createHash } from 'node:crypto'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import DocumentLibrary, { visibilityLabel } from '../src/pages/DocumentLibrary'
+import DocumentLibrary, { DOCUMENT_LIMIT, visibilityLabel } from '../src/pages/DocumentLibrary'
 import { documentFileProblem, downloadMessage, filenameFrom, uploadMessage } from '../src/pages/documentFile'
 
 afterEach(cleanup)
@@ -230,5 +230,21 @@ describe('document file helpers', () => {
     expect(filenameFrom(null)).toBeNull()
     expect(downloadMessage(503)).toBe('This file is not available yet. Ask a manager to upload it.')
     expect(uploadMessage(415)).toBe('This file type does not match the registered document.')
+  })
+})
+
+describe('document list truncation', () => {
+  const member = { list_my_clubs: { rows: [{ id: 'a', name: 'Club A', role: 'player' }] } }
+
+  it('says when the library reaches the load limit, so a member knows documents may be missing', async () => {
+    const rows = Array.from({ length: DOCUMENT_LIMIT }, (_, index) => ({ ...base, id: `d${index}`, title: `Guide ${index}`, status: 'stored' }))
+    render(<DocumentLibrary app={appWith({ ...member, list_documents: { rows } })} />)
+    expect(await screen.findByText(`Only the first ${DOCUMENT_LIMIT} documents are loaded. Some documents may not be shown.`)).toBeTruthy()
+  })
+
+  it('shows no limit notice when the library is below the load limit', async () => {
+    render(<DocumentLibrary app={appWith({ ...member, list_documents: { rows: [{ ...base, id: 'd1', title: 'Parent guidance', status: 'stored' }] } })} />)
+    expect(await screen.findByText('Parent guidance')).toBeTruthy()
+    expect(screen.queryByText(/Only the first/)).toBeNull()
   })
 })

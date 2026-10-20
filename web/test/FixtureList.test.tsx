@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import FixtureList from '../src/pages/FixtureList'
+import FixtureList, { FIXTURE_LIMIT } from '../src/pages/FixtureList'
 import { fixturesLoadMessage } from '../src/pages/fixtureListMessages'
 import { fixtureListStart } from '../src/fixtureTime'
 
@@ -82,5 +82,19 @@ describe('fixture load messages', () => {
     expect(fixturesLoadMessage({ status: 500 })).toBe('Fixtures could not be loaded for your teams.')
     expect(fixturesLoadMessage(new Error('network'))).toBe('Fixtures could not be loaded for your teams.')
     expect(fixturesLoadMessage(null)).toBe('Fixtures could not be loaded for your teams.')
+  })
+})
+
+describe('fixture list truncation', () => {
+  it('says when the list reaches the load limit, so a member knows more fixtures exist', async () => {
+    const rows = Array.from({ length: FIXTURE_LIMIT }, (_, index) => fixture({ id: `f${index}`, home_team_name: `Team ${index}` }))
+    render(<FixtureList app={appReturning({ rows })} />)
+    expect(await screen.findByText(`Only the first ${FIXTURE_LIMIT} fixtures for this view are loaded. Narrow the filters to find others.`)).toBeTruthy()
+  })
+
+  it('shows no limit notice when the list is below the load limit', async () => {
+    render(<FixtureList app={appReturning({ rows: [fixture()] })} />)
+    expect(await screen.findByRole('heading', { name: 'Northside vs Lakeside' })).toBeTruthy()
+    expect(screen.queryByText(/Only the first/)).toBeNull()
   })
 })
