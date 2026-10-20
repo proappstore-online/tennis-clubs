@@ -91,6 +91,10 @@
     {
       "name": "0023_competition_archive",
       "sql": "CREATE TABLE IF NOT EXISTS archive_run (id INTEGER PRIMARY KEY AUTOINCREMENT, direction TEXT NOT NULL CHECK(direction IN ('export','import')), performed_by TEXT, archived_at TEXT NOT NULL DEFAULT (datetime('now')), row_counts TEXT)"
+    },
+    {
+      "name": "0024_squad_history_triggers",
+      "sql": "ALTER TABLE fixture_roster ADD COLUMN updated_by TEXT; ALTER TABLE fixture_roster ADD COLUMN updated_at INTEGER"
     }
   ]
 }
