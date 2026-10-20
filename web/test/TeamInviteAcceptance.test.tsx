@@ -39,6 +39,14 @@ describe('team invite acceptance', () => {
     expect(mockApp.invites.redeem).toHaveBeenCalledTimes(1)
     expect(mockApp.actions.call).toHaveBeenCalledWith('accept_team_invite', { claim_token: 'tok-1', display_name: 'player' })
   })
+  it('does not report a join when the membership accept changed nothing', async () => {
+    mockApp.invites.redeem.mockResolvedValue({ metadata: { claimToken: 'tok-2' } })
+    mockApp.actions.call.mockImplementation(async (name: string) => (name === 'accept_team_invite' ? { changes: 0 } : { rows: [] }))
+    render(<App />)
+    expect(await screen.findByText('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')).toBeTruthy()
+    expect(screen.queryByText('You have joined the team. Open Club setup to view your fixtures.')).toBeNull()
+  })
+
   it('tells the member a link without a team membership needs a fresh link, in Tennis Clubs wording', async () => {
     mockApp.invites.redeem.mockResolvedValue({ metadata: {} })
     render(<App />)

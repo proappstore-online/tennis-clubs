@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import FixtureList from '../src/pages/FixtureList'
-import { Comps } from '../src/App'
+import { COMPS_LIMIT, Comps } from '../src/App'
 
 // Keyboard and screen-reader behaviour of the directory (Comps) and fixture pages (issue #32).
 const { mockApp } = vi.hoisted(() => ({ mockApp: { auth: { signIn: vi.fn(), user: null }, actions: { call: vi.fn() } } }))
@@ -106,5 +106,21 @@ describe('fixture dialog on the directory page', () => {
     fireEvent.keyDown(dialog, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     expect(document.activeElement).toBe(card)
+  })
+})
+
+describe('directory truncation', () => {
+  it('says when the directory shows only the next fixtures the load limit allows', async () => {
+    const rows = Array.from({ length: COMPS_LIMIT }, (_, index) => fixture({ id: `c${index}`, home_team_name: `Home ${index}` }))
+    mockApp.actions.call.mockImplementation(async (name: string) => (name === 'list_my_fixtures' ? { rows } : { rows: [] }))
+    render(<Comps user={{ id: 'u1', login: 'sam' }} onSignOut={() => {}} />)
+    expect(await screen.findByText(`Only your next ${COMPS_LIMIT} fixtures are shown here. Open Fixtures for the full list.`)).toBeTruthy()
+  })
+
+  it('shows no limit notice when fewer fixtures than the limit are returned', async () => {
+    mockApp.actions.call.mockImplementation(async (name: string) => (name === 'list_my_fixtures' ? { rows: [fixture()] } : { rows: [] }))
+    render(<Comps user={{ id: 'u1', login: 'sam' }} onSignOut={() => {}} />)
+    await screen.findByRole('button', { name: /Northside vs Lakeside/ })
+    expect(screen.queryByText(/Only your next/)).toBeNull()
   })
 })

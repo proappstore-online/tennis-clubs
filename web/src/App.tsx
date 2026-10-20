@@ -19,6 +19,8 @@ type Availability = 'in' | 'out' | 'pending'
 type Fixture = { id: string; starts_at: string; time_status: string | null; arrival_at: string | null; round_label: string | null; status: string; home_score: number | null; away_score: number | null; status_updated_at: number | null; match_notice: string | null; home_team_name: string; away_team_name: string; member_side: 'home' | 'away' | null; opponent_name: string | null; is_external_opponent: number | null; division_name: string | null; venue_name: string | null; venue_address: string | null; map_url: string | null; venue_notes: string | null; my_availability: Availability | null }
 type RosterPlayer = { user_id: string; display_name: string; availability: Availability; selection?: string | null }
 
+// The Comps view loads this many upcoming fixtures; a notice says when there are more (issue #12).
+export const COMPS_LIMIT = 24
 const selectionLabelFor = (value: string) => ({ pending: 'Selection pending', unavailable: 'Unavailable', emergency_call_up: 'Emergency call-up' } as Record<string, string>)[value] ?? value
 const availabilityLabel = (value: Availability | null) => value === 'in' ? 'Playing' : value === 'out' ? 'Unavailable' : 'Reply needed'
 const statusLabel = (value: string) => ({ scheduled: 'Scheduled', washout: 'Washout', heat_out: 'Heat-out', forfeit: 'Forfeit', complete: 'Complete' }[value] ?? value)
@@ -87,7 +89,9 @@ function TeamInviteAcceptance({ app: inviteApp, code }: { app: typeof app; code:
         if (!token) { setMessage('This invite link does not include a team membership. Ask the club for a fresh link.'); return }
         const displayName = inviteApp.auth.user?.login ?? 'Team member'
         await inviteApp.actions.call('activate_invited_club_membership', { id: crypto.randomUUID(), claim_token: token, display_name: displayName })
-        await inviteApp.actions.call('accept_team_invite', { claim_token: token, display_name: displayName })
+        const accepted = await inviteApp.actions.call('accept_team_invite', { claim_token: token, display_name: displayName })
+        // A refused accept changed no membership, so the member must not be told they joined.
+        if (outcomeOf(accepted) === 'refused') { setMessage('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.'); return }
         setMessage('You have joined the team. Open Club setup to view your fixtures.')
       } catch {
         setMessage('This invite link could not be accepted. It may have expired or already been used. Ask the club for a fresh link.')
@@ -109,7 +113,7 @@ export function Comps({ user, onSignOut }: { user: { id: string; login: string }
     if (!user) return
     setLoading(true); setError(null)
     try {
-      const result = await app.actions.call<{ rows: Fixture[] }>('list_my_fixtures', { from: fixtureListStart(), limit: 24 })
+      const result = await app.actions.call<{ rows: Fixture[] }>('list_my_fixtures', { from: fixtureListStart(), limit: COMPS_LIMIT })
       setFixtures(result.rows ?? [])
     } catch { setError('Your fixture list could not be loaded. Please try again.') }
     finally { setLoading(false) }
@@ -156,6 +160,7 @@ export function Comps({ user, onSignOut }: { user: { id: string; login: string }
     {error && <div role="alert" className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-[var(--danger)]/25 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger-ink)]"><span>{error}</span><button onClick={() => void load()} className="font-semibold underline">Retry</button></div>}
     <section className="mt-7 grid gap-4 sm:grid-cols-3"><Stat label="Upcoming fixtures" value={loading ? '—' : String(upcoming.length)} tone="var(--sky-soft)" /><Stat label="Replies needed" value={loading ? '—' : String(pending)} tone="var(--accent-soft)" /><Stat label="First module" value="Comps" tone="var(--mint-soft)" /></section>
     <section className="mt-8"><div className="flex items-end justify-between gap-3"><div><h2 className="display-font text-2xl font-bold text-[var(--ink)]">Your next games</h2><p className="mt-1 text-sm text-[var(--muted)]">Tap a fixture for the team list, location and your availability.</p></div><button onClick={() => void load()} className="min-h-11 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)]">Refresh</button></div>
+      {!loading && fixtures.length >= COMPS_LIMIT && <p role="status" className="mt-4 text-sm text-[var(--muted)]">Only your next {COMPS_LIMIT} fixtures are shown here. Open Fixtures for the full list.</p>}
       {loading ? <LoadingCards /> : fixtures.length === 0 ? <EmptyComps onSignOut={onSignOut} /> : <ul className="mt-4 grid list-none gap-3">{fixtures.map((fixture) => <li key={fixture.id}><FixtureCard fixture={fixture} onOpen={() => void openFixture(fixture)} /></li>)}</ul>}
     </section>
     {selected && <FixtureDetail fixture={selected} roster={roster} saving={saving} onClose={() => setSelected(null)} onAvailability={setAvailability} />}
