@@ -86,6 +86,16 @@ class FixtureTimingTests(unittest.TestCase):
         self.assertIn((3, "warning", "mixed_date_format"), mixed)
         self.assertNotIn("invalid_date", [code for _, _, code in mixed])
 
+    def test_impossible_calendar_dates_are_flagged_with_or_without_other_fields(self):
+        # SQLite builds differ on whether date() normalises 2026-02-30, so the check must not depend on it (issue #12).
+        for date in ["2026-02-30", "2027-02-29", "2026-04-31", "2026-13-01", "2026-00-10", "31/04/2026", "29/02/2027"]:
+            for round_label in ["R2", "R3"]:
+                with self.subTest(date=date, round=round_label):
+                    self.assertIn((2, "blocking", "invalid_date"), self.codes([row(source_row=2, date=date, round=round_label)]))
+        for date in ["2028-02-29", "2026-12-31", "31/12/2026", "29/02/2028"]:
+            with self.subTest(date=date):
+                self.assertNotIn("invalid_date", [code for _, _, code in self.codes([row(date=date)])])
+
     def test_missing_start_time_is_a_tbc_warning_and_arrival_needs_a_confirmed_start(self):
         codes = self.codes([row(start_time="", arrival_time="08:30")])
         self.assertEqual(codes, [(2, "warning", "arrival_without_start"), (2, "warning", "start_time_missing")])
