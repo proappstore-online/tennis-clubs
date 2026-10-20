@@ -12,9 +12,9 @@ function renderWith(writes: Record<string, unknown>) {
     if (name in writes) return writes[name]
     return { rows: [] }
   })
-  const app = { actions: { call }, invites: { create: vi.fn() }, auth: { user: null } }
+  const app = { actions: { call }, invites: { create: vi.fn(async () => ({ id: 'invite-1', code: 'CODE1' })), revoke: vi.fn(async () => undefined) }, auth: { user: null } }
   render(<ClubAdmin app={app as never} />)
-  return { call, invitesCreate: app.invites.create }
+  return { call, invitesCreate: app.invites.create, invitesRevoke: app.invites.revoke }
 }
 
 describe('club administration writes', () => {
@@ -30,14 +30,26 @@ describe('club administration writes', () => {
     expect(call).toHaveBeenCalledWith('record_audit_event', expect.objectContaining({ action: 'create_season', outcome: 'refused' }))
   })
 
-  it('does not create an invite link for a team membership the server did not write', async () => {
-    const { invitesCreate } = renderWith({ create_team_invite: { changes: 0 }, list_club_teams: { rows: [{ id: 'team-1', name: 'Seniors', division_name: null }] } })
+  it('revokes the SDK invite and shows no link when the team membership is not written', async () => {
+    const { invitesCreate, invitesRevoke } = renderWith({ create_team_invite: { changes: 0 }, list_club_teams: { rows: [{ id: 'team-1', name: 'Seniors', division_name: null }] } })
     // The button stays disabled until the team list has loaded, so wait for the option first.
-    await screen.findByRole('option', { name: 'Seniors' })
+    await screen.findByRole('option', { name: 'Seniors' }, { timeout: 5000 })
     fireEvent.change(screen.getByLabelText('Invite team'), { target: { value: 'team-1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create invite' }))
     expect(await screen.findByText('The invite link could not be created. Check that the team is still active, then try again.')).toBeTruthy()
-    expect(invitesCreate).not.toHaveBeenCalled()
+    expect(invitesCreate).toHaveBeenCalledTimes(1)
+    expect(invitesRevoke).toHaveBeenCalledWith('invite-1')
+    expect(screen.queryByLabelText('Invite link')).toBeNull()
+  })
+
+  it('writes no membership when the SDK cannot create the invite', async () => {
+    const { call, invitesCreate } = renderWith({ list_club_teams: { rows: [{ id: 'team-1', name: 'Seniors', division_name: null }] } })
+    invitesCreate.mockRejectedValueOnce(new Error('synthetic SDK failure'))
+    await screen.findByRole('option', { name: 'Seniors' }, { timeout: 5000 })
+    fireEvent.change(screen.getByLabelText('Invite team'), { target: { value: 'team-1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create invite' }))
+    expect(await screen.findByText('The invite link could not be created. Check that the team is still active, then try again.')).toBeTruthy()
+    expect(call).not.toHaveBeenCalledWith('create_team_invite', expect.anything())
     expect(screen.queryByLabelText('Invite link')).toBeNull()
   })
 })

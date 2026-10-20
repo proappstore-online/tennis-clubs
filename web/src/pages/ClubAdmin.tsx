@@ -131,14 +131,18 @@ export default function ClubAdmin({ app }: { app: ProAppStore }) {
     const token = id()
     setBusy(true); setError(''); setMessage(''); setInviteLink('')
     try {
+      // The SDK invite is created first: if that fails, nothing is written, so no pending membership is left without a link.
+      // The invite carries no account role; redeeming it creates the club and team membership.
+      const invite = await app.invites.create({ group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
       const inviteId = id()
       const result = await app.actions.call('create_team_invite', { id: inviteId, team_id: teamId, invite_token: token })
       const outcome = outcomeOf(result)
       await recordAudit(app, { orgId: clubId, action: 'create_team_invite', targetType: 'team_invite', targetId: inviteId, outcome })
-      // No pending membership was written, so an invite link for it would never be accepted.
-      if (outcome === 'refused') throw new Error('The team membership was not created.')
-      // The invite carries no account role; redeeming it creates the club and team membership.
-      const invite = await app.invites.create({ group: `team:${teamId}`, metadata: { claimToken: token }, uses: 1, expiresIn: '7d' })
+      if (outcome === 'refused') {
+        // No membership was written, so the invite must not stay usable: revoke it.
+        await app.invites.revoke(invite.id).catch(() => undefined)
+        throw new Error('The team membership was not created.')
+      }
       setInviteLink(`${window.location.origin}/join/${invite.code}`)
       setMessage('Invite link created. Share it with the player; they join the team when they open it.')
       await loadClubData()
