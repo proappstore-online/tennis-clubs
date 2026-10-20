@@ -1,5 +1,5 @@
 {
-  "_comment": "Performance budgets (issue #35). Query budgets are milliseconds, the median of 7 runs after one warm-up, on the seeded association in tests/association_seed.py. Bundle budgets are gzipped kilobytes of web/dist/assets. Change a budget only with a recorded reason in docs/performance-budgets.md.",
+  "_comment": "Performance budgets (issue #35). Query budgets are milliseconds, the median of 7 runs after one warm-up, on the seeded association in tests/association_seed.py. Bundle budgets are gzipped kilobytes of web/dist/assets. Change a budget only with a recorded reason in docs/performance-budgets.md. Page budgets (issue #30) are the summed median of a page's server calls, measured by scripts/check-page-budget.py.",
   "scale": {
     "organizations": 40,
     "seasons": 120,
@@ -18,5 +18,15 @@
   "bundle_gzip_kb": {
     "js": 125,
     "css": 8
+  },
+  "pages": {
+    "fixtures": {
+      "budget_ms": 100,
+      "description": "The Fixtures page for a signed-in member: the upcoming list, then one fixture's roster."
+    },
+    "directory": {
+      "budget_ms": 50,
+      "description": "The Club setup directory: the club's venues and its teams. Directory search does not exist yet."
+    }
   }
 }

@@ -16,6 +16,21 @@ Status: in force for CI. Issue #35 (slice 5 of #26). The machine-readable budget
 
 Query budgets are in milliseconds and measure the median of 7 runs after one warm-up run. The seed is `tests/association_seed.py`, which generates the same association each time.
 
+## Page budgets
+
+Issue #30. A page budget limits what a page costs the server in total. The page's cost is the sum of the median latency of the calls it makes, measured on the seeded association by `scripts/check-page-budget.py`.
+
+| Page | Budget | What it covers |
+| --- | --- | --- |
+| `fixtures` | 100 ms | The Fixtures page for a signed-in member: the upcoming list (`list_my_fixtures`), then one fixture's roster (`list_fixture_roster`). |
+| `directory` | 50 ms | The Club setup directory: the club's venues (`list_club_venues`) and its teams (`list_club_teams`). |
+
+Directory search and map search do not exist yet, so there is no page for them. When a search is added it needs its own page entry, with the calls it makes.
+
+`tests/test_page_budgets.py` checks that the page list in the budget file matches the pages the script measures, that every call is an action in the manifest, and that the script exits non-zero when a page is over budget and refuses a malformed budget file. CI runs the Python unit tests, so a page over budget fails the build.
+
+Limits: the page cost is a sum of server calls, measured on SQLite. No browser runs in CI, so rendering time is not in the page budget. The bundle budget above is the only load-time check.
+
 ## Measured baseline
 
 Local runs of the seeded association on the development machine (medians, milliseconds):
