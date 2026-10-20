@@ -125,6 +125,20 @@ describe('real ClubAdmin first-club onboarding', () => {
     expect(screen.queryByRole('textbox', { name: 'Club name' })).toBeNull()
   })
 
+  it('tells an account whose earlier club access is inactive that it has no access, and offers no create or resume form', async () => {
+    // The server returns no eligibility row when the account has an inactive membership or a club it created with no active access.
+    resetStore()
+    const backend = mockApp.actions.call.getMockImplementation()!
+    mockApp.actions.call.mockImplementation(async (name: string, values: Record<string, unknown> = {}) => (name === 'can_create_first_club' ? { rows: [] } : backend(name, values)))
+    renderClubAdmin()
+
+    expect(await screen.findByText('You don’t have club administration access yet. Ask a club administrator to add you as a manager.')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Create a new club' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Club name' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Resume club setup' })).toBeNull()
+    expect(mockApp.actions.call).not.toHaveBeenCalledWith('create_club', expect.anything())
+  })
+
   it('shows actionable access feedback when the authenticated identity is missing', async () => {
     resetStore(null)
     renderClubAdmin()
