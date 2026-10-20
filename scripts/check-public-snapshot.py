@@ -11,8 +11,23 @@ from pathlib import Path
 
 EXPECTED_EMAIL = "2824906+serge-ivo@users.noreply.github.com"
 EXPECTED_NAME = "serge-ivo"
-# Already public on origin/main before this check existed: grandfathered for the identity rule only. Tree and secret scans still apply to it. Every other commit must use the noreply identity.
-GRANDFATHERED_IDENTITY_COMMITS = frozenset({"3b193a222600361043dd45a9ec2a58e5e1ab1195"})
+# Already public on origin/main: grandfathered for the identity rule only (author, committer and
+# trailer emails). Tree and secret scans still apply to them. Every other commit must use the
+# noreply identity.
+GRANDFATHERED_IDENTITY_COMMITS = frozenset({
+    # Before this check existed.
+    "3b193a222600361043dd45a9ec2a58e5e1ab1195",
+    # Runner-router rollout (proappstore-online/template-app#1, #2): committed by an agent under the
+    # local Git identity with a co-author trailer. Public, so not rewritten (owner decision on #2).
+    "252f42c761637db4cd6cb05c2436b9608d62ac4d",
+    "f609db28125cd90f0cb68265ec87da82faf5bb81",
+    "7f1510a0419c69b82e3fe50ef21442275cc14583",
+    "a24c29034ea4375cee99a60b799abe1e70da51bd",
+    "6831ae8314f9972014dbbcf4a5506cef6e9a9f9f",
+    "f8092a6001c4fa4115a07513be63b37b2e63f7a9",
+    "a01064179452392002360c690baa20f7744d5240",
+    "2749349e96b6553f3afe97f1d29527256446e8f3",
+})
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PATHS = (
     "docs/source-material/",
@@ -92,7 +107,8 @@ def main() -> int:
         )
         fields = metadata.split("\x1f", 4)
         author_name, author_email, committer_name, committer_email, message = fields
-        if commit_id not in GRANDFATHERED_IDENTITY_COMMITS and (
+        grandfathered = commit_id in GRANDFATHERED_IDENTITY_COMMITS
+        if not grandfathered and (
             author_name != EXPECTED_NAME
             or author_email != EXPECTED_EMAIL
             or committer_name != EXPECTED_NAME
@@ -109,7 +125,7 @@ def main() -> int:
             check=True,
         ).stdout
         trailer_emails = re.findall(r"[\w.+-]+@[\w.-]+", trailers)
-        if any(email != EXPECTED_EMAIL for email in trailer_emails):
+        if not grandfathered and any(email != EXPECTED_EMAIL for email in trailer_emails):
             errors.append("a commit trailer contains an unexpected email address")
             break
         raw_commit = subprocess.check_output(
