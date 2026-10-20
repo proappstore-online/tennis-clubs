@@ -104,6 +104,31 @@ cd tests && python3 -m unittest test_competition_archive -v
 
 `tests/test_mcp_contract.py` checks that the archive actions follow the platform rules for roles, idempotency and audit, and `tests/test_mcp_permissions.py` checks that each action is covered.
 
+## Recovery rehearsal
+
+Issue #30. The restore is rehearsed automatically on every test run, and the rehearsal is also a written procedure you can repeat on a copy of your own data.
+
+**Automated (in the repository).** `tests/test_recovery_rehearsal.py` builds the 40-club association of `tests/association_seed.py` (about 20,000 fixtures), exports one club, restores the archive into an empty copy of that club, and checks:
+
+- the archive holds every record of the club, and every section is counted before the restore;
+- the restore writes exactly the number of records each section holds;
+- after the restore nothing is missing, and a second restore writes nothing;
+- the restored fixtures, teams, seasons and rosters match the original row for row;
+- re-exporting the restored club gives the same archive;
+- player names and result submissions survive the restore, and another club's archive is refused.
+
+It runs in a few seconds with the Python unit tests. A broken restore step fails it. `tests/test_competition_archive.py` covers the small hand-written club and the refusals.
+
+**On a copy of your own data (a manual step, not done by the repository).** The rehearsal above uses synthetic data. Before relying on the procedure for a real club, repeat it on a copy:
+
+1. Take a copy of the live club's data into a separate database that no one uses for play. Do not run the steps against the live club.
+2. Export the copy's club with `export_competition_archive`, and record it with `record_archive_run`.
+3. Restore that archive into an empty club in another copy, following the restore procedure above.
+4. Check with `import_competition_archive` that every `*_to_restore` count is 0, and compare the fixture counts and scores with the original.
+5. Write down the date, the club, the row counts before and after, and anything that did not match. Keep the note with the archive run log.
+
+Until step 5 has been written down for a real copy, the restore is tested, but not yet rehearsed against live-shaped data.
+
 ## Known limits
 
 - **Migration numbering.** The archive audit table is migration `0023_competition_archive`. The migrations before it end at `0019`, so there is no `0020` to `0022`.
