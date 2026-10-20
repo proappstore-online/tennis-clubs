@@ -128,11 +128,21 @@ const { user, loading, signIn, signOut } = useProAuth(app)
 - API keys that cost money: use `app.proxy.fetch()`.
 - Local dev: use `.env.local` (gitignored).
 
-## CI workflows
+## CI runner rules
 
-Every workflow job must go through the router job (see `.github/workflows/*.yml` for the pattern).
-Never hard-code `ubuntu-latest` or any other runner label directly on a job — always use
-`runs-on: ${{ fromJSON(needs.router.outputs.runner) }}` and declare `needs: router`. The router
-(`serge-ivo/runner-router/.github/workflows/router.yml@v1`) checks the org's Actions minutes and
-fails over to the self-hosted `pags` runners when they run out, so a hard-coded hosted label is a
-job that stops running the day the minutes do.
+- **Public repos always build on GitHub-hosted runners** (`ubuntu-latest`, unlimited free
+  minutes) and must **never** use self-hosted runners.
+- **Private repos go through the billing-aware router** (`ProAgentStore/runner-router@v1`):
+  GitHub-hosted while the org's included Actions minutes remain, self-hosted `pags` runners only
+  once they are spent (or when the billing check fails).
+- **No org-level secrets, ever.** On the free plan they are readable by public repos.
+- **The billing token is a repo-level secret (`RUNNER_BILLING_TOKEN`) on private repos only.**
+  Public repos have no billing token.
+- **The self-hosted runner group stays private-only.** Never allow public repositories on it.
+
+How the workflows follow this: every workflow starts with a `router` job calling
+`ProAgentStore/runner-router/.github/workflows/router.yml@v1`, and every other job declares
+`needs: router` and `runs-on: ${{ fromJSON(needs.router.outputs.runner) }}`. On a public repo the
+router job itself runs on `ubuntu-latest` and returns `["ubuntu-latest"]` without a billing check
+or reading any secret. Never hard-code a runner label (`ubuntu-latest`, `self-hosted`, anything
+else) on a job, and never add a job that skips the router.
