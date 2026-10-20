@@ -114,6 +114,15 @@ class SquadPoolTests(unittest.TestCase):
         self.assertEqual([(row["action"], row["actor_user_id"]) for row in pool_history], [("deactivated", "conv-a"), ("pool_set", "conv-a")])
         self.assertEqual(self.rows("list_team_pool_history", EMERGENCY, org_id="a", team_id="ta"), [])
 
+    def test_roster_rows_record_who_last_changed_them_and_when(self):
+        self.select("conv-a", REGULAR, "selected")
+        row = self.db.execute("SELECT updated_by, updated_at FROM fixture_roster WHERE fixture_id='fa' AND user_id=?", (REGULAR,)).fetchone()
+        self.assertEqual(tuple(row), ("conv-a", 1000))
+        self.assertEqual(self.select("reg-a", REGULAR, "unavailable").rowcount, 0)
+        self.select("conv-a", REGULAR, "unavailable")
+        row = self.db.execute("SELECT selection, updated_by FROM fixture_roster WHERE fixture_id='fa' AND user_id=?", (REGULAR,)).fetchone()
+        self.assertEqual(tuple(row), ("unavailable", "conv-a"))
+
     def test_deactivated_squad_member_cannot_be_selected_until_reinstated(self):
         self.run_action("deactivate_team_player", "conv-a", org_id="a", team_id="ta", user_id=REGULAR)
         self.assertEqual(self.select("conv-a", REGULAR, "selected").rowcount, 0)
