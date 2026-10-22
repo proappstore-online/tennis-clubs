@@ -26,6 +26,7 @@ Delivered in `9f974f0`.
 - Mobile-first layout: styles are written for the smallest screen first and widened with `min-width` media queries. Guarded by `AccessibilityBaseline.test.ts`.
 - Colour tokens in `web/src/index.css`, with contrast checked for the text and surface pairs by `ContrastTokens.test.ts`.
 - Keyboard: a skip link is the first Tab stop in the header and targets a focusable `#main-content` wrapper. Focus rings are visible on buttons, links, inputs, selects and textareas.
+- Layout primitives (#40): `PageFrame`, `Stack` and `CardGrid` in `web/src/ui/layout.tsx`, backed by the `.container-app`, `.stack*`, `.grid-auto` and `.grid-3` classes. The directory (`Comps`) and the fixture page use them. The classes set no height, transition, animation or transform, and `web/test/LayoutPrimitives.test.tsx` fails if one does. That keeps the 44px control minimum and the reduced-motion rule in force for everything inside them. It is a stylesheet check, not a rendered one.
 - Touch targets: native controls are at least 44px.
 - Motion: transitions, animations and press-scale effects are switched off under `prefers-reduced-motion`.
 - Semantics: the fixture period tabs follow the ARIA tabs pattern (arrow keys, Home and End), and the directory dialog is a named modal that moves focus in and returns it on close. Covered by `DirectoryAccessibility.test.tsx`.
