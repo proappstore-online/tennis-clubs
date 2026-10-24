@@ -30,3 +30,12 @@ skips the router.
 
 Background, in plain English: README, "CI" section. Router behaviour and tests:
 https://github.com/ProAgentStore/runner-router.
+
+## Delivery
+
+Set by the repository owner. These add to the rules above and remove none of them.
+
+- **Push directly to `main`.** Commit on `main` and `git push origin main`; that push is also the deploy.
+- **Never open a pull request and never create a new branch for delivery work.** Do not force-push, and do not delete branches left behind by earlier work.
+- **Run the normal pre-push hook** (`scripts/check-public-snapshot.py`) and let it finish. Do not bypass it.
+- Commit with the owner's noreply identity and no co-author trailers.

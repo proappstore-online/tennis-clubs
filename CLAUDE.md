@@ -149,3 +149,9 @@ How the workflows follow this: every workflow starts with a `router` job calling
 `needs: router` and `runs-on: ${{ fromJSON(needs.router.outputs.runner) }}`. Never hard-code a
 runner label (`ubuntu-latest`, `self-hosted`, anything else) on a job, and never add a job that
 skips the router.
+
+## Delivery
+
+- Push directly to `main` (`git push origin main`, which also deploys). Never open a pull request or create a new branch for delivery work, never force-push, and never delete branches left behind by earlier work.
+- Let the pre-push hook finish; do not bypass it. Commit with the owner's noreply identity and no co-author trailers.
+- The same rules are in `AGENTS.md`.
