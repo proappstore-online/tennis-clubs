@@ -30,6 +30,23 @@ JUSTIFIED = {
     "get_club": ("member", "a club's name and slug, for an active member of that club"),
     "list_external_clubs": ("member", "opponent clubs of a club, read-only, for an active member of that club"),
     "list_my_clubs": ("member", "the caller's own active club memberships"),
+    # Geography, competition authorities and scoped roles (issue #20). These are not club actions: their scope is a grant in scoped_role_grants.
+    "create_geo_area": ("site-admin", "adds an area to the geographic hierarchy; only an active site administrator"),
+    "set_geo_level_label": ("site-admin", "sets the display label of a hierarchy level; only an active site administrator"),
+    "create_competition_authority": ("site-admin", "creates an association; only an active site administrator"),
+    "link_club_to_authority": ("site-admin", "links a club to an association; only an active site administrator, never an association or club administrator"),
+    "link_club_venue": ("site-admin", "records that a club also uses another club's shared venue; only an active site administrator"),
+    "grant_scoped_role": ("scoped-grant", "a site administrator grants any role; an association administrator grants association roles within their own authority"),
+    "revoke_scoped_role": ("scoped-grant", "a site administrator revokes any grant; an association administrator revokes grants within their own authority"),
+    "list_my_scoped_roles": ("self", "the caller's own active scoped grants"),
+    "create_competition": ("authority-admin", "creates a competition in an association; only that association's active administrator"),
+    "list_authority_clubs": ("authority-admin", "the clubs linked to an association; only that association's active administrator"),
+    "list_authority_competitions": ("authority-admin", "the competitions of an association; only that association's active administrator"),
+    "link_competition_season": ("authority-admin", "attaches a member club's season to the association's competition; only that association's active administrator"),
+    "assign_division_competition": ("authority-admin", "places a division in the association's competition; only that association's active administrator"),
+    "list_competition_seasons": ("authority-admin", "the seasons attached to a competition; only that association's active administrator"),
+    "list_geo_levels": ("signed-in", "the configured level labels of the geography; any signed-in user, no club data"),
+    "list_geo_areas": ("signed-in", "named geographic areas; any signed-in user, no club data"),
 }
 
 # The scope each justified class relies on, checked against the SQL. A class whose SQL does not match fails.
@@ -39,6 +56,10 @@ SCOPE_CHECKS = {
     "creator": lambda sql: "created_by=:__user_id" in sql.replace(" ", ""),
     "invite-token": lambda sql: ":claim_token" in sql and "user_id IS NULL" in sql,
     "member": lambda sql: "club_memberships" in sql and ":__user_id" in sql and "is_active=1" in sql.replace(" ", ""),
+    "site-admin": lambda sql: "p.role = 'site_admin'" in sql and "p.revoked_at IS NULL" in sql and ":__user_id" in sql,
+    "authority-admin": lambda sql: "a.role = 'association_admin'" in sql and "a.revoked_at IS NULL" in sql and ":__user_id" in sql,
+    "scoped-grant": lambda sql: "p.role = 'site_admin'" in sql and "a.role = 'association_admin'" in sql and "revoked_at IS NULL" in sql and ":__user_id" in sql,
+    "signed-in": lambda sql: "length(COALESCE(:__user_id, '')) > 0" in sql,
 }
 
 # Actions whose SQL does not bind the caller. None exist; an entry here would need a written reason.

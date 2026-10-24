@@ -76,3 +76,25 @@ Notes on the matrix:
 - Scorecard file access is enforced by platform storage, which this repository does not configure. Its authorization is unverified here.
 - Roster contact details are stored by import but have no read path.
 - Admin-only server actions are the competition draw import family and `admin`-visibility documents. Convenor and manager are identical server-side.
+
+## Geography, competition authorities and scoped roles (issue #20)
+
+Clubs are still the tenant for every existing action. The new model sits above them, and the club-first checks above are unchanged. The model comes from PR #27 and was completed directly on `main`.
+
+- **Geography:** `geo_areas` form a tree of `country → jurisdiction → region → locality`. The display label for each level is data in `geo_level_labels`, set by a site administrator with `set_geo_level_label` and read by any signed-in user with `list_geo_levels` and `list_geo_areas`. Nothing in the app hard-codes "state", "region" or "district". A root area must be a country, and a child must sit under a higher level. Only area names are stored (see `privacy-data-classification.md`).
+- **Competition authorities:** `competition_authorities` (associations) belong to a geographic area and are not clubs.
+- **Membership edges, kept separate:**
+  - association ↔ club: `authority_club_memberships`, one row per (authority, club). A club can join several associations without a duplicate club row.
+  - club ↔ venue: a venue is owned by one club (`venues.org_id`). `club_venues` records the other clubs that also use a shared venue. `list_club_venue_links` returns both, with the relationship.
+  - season ↔ competition: `competition_seasons`. A competition belongs to one authority (`competitions.authority_id`). A season can sit in several competitions.
+  - competition ↔ division: `divisions.competition_id`, empty until an association administrator places the division. Division ↔ team is the existing `teams.division_id`.
+- **Scoped roles:** `scoped_role_grants` holds (user, scope type, scope id, role) with `revoked_at` and `revoked_by` instead of deletion. A user can hold different roles at different scopes. The roles are `site_admin`, `geo_admin`, `association_admin`, `club_admin`, `competition_manager`, `team_manager`, `scorer`, `member` and `viewer`. A grant needs a scope that exists. A revoked grant can be granted again, which reactivates the same row.
+- **What each role can do today:** `site_admin` builds the geography, creates authorities, links clubs to authorities, links a club to a shared venue, and grants or revokes any role. `association_admin` manages their own authority: competitions, season and division placement, listing its clubs, and granting `association_admin`, `competition_manager` or `viewer` there. Every other role is recorded for later slices (#22 to #24) and confers nothing yet. They deny by default, and tests assert this. There is no separate venue-administrator role; the issue does not define one.
+- **Who may link a club to an association:** only a site administrator (owner decision, 2026-10-24). There is no acceptance step and no club consent. Association administrators cannot attach clubs, and neither can club administrators.
+- **Isolation:** association data and writes check an active `association_admin` grant on that authority. Club administrators get nothing at association scope from their club role. An association administrator can place a club's season in their competition only if the site administrator has already linked that club to their association.
+- **Backfill:** each active club `admin` gets a mirror `club_admin` grant at club scope, recorded with `granted_by = migration-0025`. Convenors, managers and former admins are not mirrored. No club is placed in an authority, and no season, division or venue is linked, automatically. The first site administrator is an operator-inserted row, never granted by the migration.
+
+Known limits:
+- Existing club actions still read `club_memberships` only, on purpose. A scoped `club_admin` grant neither widens nor narrows club access, so existing admins keep exactly the access they had. Moving club checks onto scoped grants would widen access and needs its own decision.
+- The audit recorder (`record_audit_event`) accepts the new write actions on its allowlist, but it is gated to club managers, so a site or association administrator who is not also a club manager cannot record through it. Provenance is kept on the rows themselves (`created_by`, `granted_by`, `revoked_by`, `revoked_at`).
+- Club-venue links and venue sharing are recorded by a site administrator only. Who else may do this is not decided.

@@ -1642,7 +1642,7 @@
       "name": "record_audit_event",
       "description": "Record a managed write (succeeded or refused) in the club audit trail; the actor is the authenticated caller",
       "operation": "execute",
-      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'bootstrap_club_admin', 'change_document_visibility', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'record_import_run_issues', 'register_document', 'remove_fixture_roster_player', 'restore_archive_divisions', 'restore_archive_external_club_aliases', 'restore_archive_external_clubs', 'restore_archive_fixture_roster', 'restore_archive_fixtures', 'restore_archive_result_submissions', 'restore_archive_roster_players', 'restore_archive_seasons', 'restore_archive_team_players', 'restore_archive_teams', 'restore_archive_venues', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND (:target_id IS NULL OR (length(:target_id)<=120 AND instr(:target_id,' ')=0 AND instr(:target_id,'@')=0)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
+      "sql": "INSERT INTO audit_events (id,org_id,actor_user_id,action,target_type,target_id,outcome,created_at) SELECT :id,:org_id,:__user_id,:action,:target_type,:target_id,:outcome,:__now WHERE :action IN ('add_external_club_alias', 'add_fixture_roster_player', 'apply_draw_divisions', 'apply_draw_external_aliases', 'apply_draw_external_clubs', 'apply_draw_fixture_updates', 'apply_draw_fixtures', 'apply_draw_placeholders', 'apply_draw_provenance', 'apply_draw_roster', 'apply_draw_seasons', 'apply_draw_teams', 'apply_draw_venue_updates', 'apply_draw_venues', 'apply_fixture_result_to_fixture', 'approve_fixture_review', 'assign_division_competition', 'bootstrap_club_admin', 'change_document_visibility', 'create_competition', 'create_competition_authority', 'create_division', 'create_external_club', 'create_external_club_placeholder', 'create_geo_area', 'create_season', 'create_team', 'create_team_invite', 'create_venue', 'deactivate_team_player', 'delete_contact_detail', 'grant_scoped_role', 'link_club_to_authority', 'link_club_venue', 'link_competition_season', 'mark_document_stored', 'reconcile_imported_fixture_time', 'record_draw_import_outcomes', 'record_draw_import_run', 'record_import_run_issues', 'register_document', 'remove_fixture_roster_player', 'restore_archive_divisions', 'restore_archive_external_club_aliases', 'restore_archive_external_clubs', 'restore_archive_fixture_roster', 'restore_archive_fixtures', 'restore_archive_result_submissions', 'restore_archive_roster_players', 'restore_archive_seasons', 'restore_archive_team_players', 'restore_archive_teams', 'restore_archive_venues', 'revoke_scoped_role', 'schedule_fixture', 'set_contact_detail', 'set_external_club_home_venue', 'set_geo_level_label', 'set_team_player_pool', 'set_venue_shared', 'submit_fixture_result', 'update_document_details', 'update_fixture_match_day', 'update_venue', 'upsert_imported_fixture', 'upsert_imported_roster_player', 'withdraw_document') AND (:target_id IS NULL OR (length(:target_id)<=120 AND instr(:target_id,' ')=0 AND instr(:target_id,'@')=0)) AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id=:org_id AND cm.user_id=:__user_id AND cm.is_active=1 AND cm.role IN ('admin','convenor','manager'))",
       "params": {
         "id": {
           "type": "string"
@@ -1669,17 +1669,25 @@
             "apply_draw_venues",
             "apply_fixture_result_to_fixture",
             "approve_fixture_review",
+            "assign_division_competition",
             "bootstrap_club_admin",
             "change_document_visibility",
+            "create_competition",
+            "create_competition_authority",
             "create_division",
             "create_external_club",
             "create_external_club_placeholder",
+            "create_geo_area",
             "create_season",
             "create_team",
             "create_team_invite",
             "create_venue",
             "deactivate_team_player",
             "delete_contact_detail",
+            "grant_scoped_role",
+            "link_club_to_authority",
+            "link_club_venue",
+            "link_competition_season",
             "mark_document_stored",
             "reconcile_imported_fixture_time",
             "record_draw_import_outcomes",
@@ -1698,9 +1706,11 @@
             "restore_archive_team_players",
             "restore_archive_teams",
             "restore_archive_venues",
+            "revoke_scoped_role",
             "schedule_fixture",
             "set_contact_detail",
             "set_external_club_home_venue",
+            "set_geo_level_label",
             "set_team_player_pool",
             "set_venue_shared",
             "submit_fixture_result",
@@ -4262,6 +4272,544 @@
           "scorecard_path",
           "scorecard_user_id"
         ]
+      }
+    },
+    {
+      "name": "create_geo_area",
+      "description": "Site administrator adds an area to the geographic hierarchy; a root area must be a country and a child must sit under a higher level",
+      "operation": "execute",
+      "sql": "INSERT INTO geo_areas(id,parent_id,level,name,created_at) SELECT :id,NULLIF(:parent_id,''),:level,trim(:name),:__now WHERE EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL) AND length(trim(:name)) > 0 AND EXISTS (SELECT 1 FROM geo_level_labels l WHERE l.level = :level) AND ((NULLIF(:parent_id,'') IS NULL AND :level = 'country') OR EXISTS (SELECT 1 FROM geo_areas pa JOIN geo_level_labels pl ON pl.level = pa.level JOIN geo_level_labels cl ON cl.level = :level WHERE pa.id = :parent_id AND pl.position < cl.position))",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "country",
+            "jurisdiction",
+            "region",
+            "locality"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "site-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "set_geo_level_label",
+      "description": "Site administrator sets the display label for a geographic level, so terminology is deployment configuration",
+      "operation": "execute",
+      "sql": "UPDATE geo_level_labels SET label = trim(:label) WHERE level = :level AND length(trim(:label)) > 0 AND EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL)",
+      "params": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "country",
+            "jurisdiction",
+            "region",
+            "locality"
+          ]
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "site-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "create_competition_authority",
+      "description": "Site administrator creates a competition authority (association) under a geographic area",
+      "operation": "execute",
+      "sql": "INSERT INTO competition_authorities(id,area_id,name,created_by,created_at) SELECT :id,g.id,trim(:name),:__user_id,:__now FROM geo_areas g WHERE g.id = :area_id AND length(trim(:name)) > 0 AND EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL)",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "area_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "site-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "create_competition",
+      "description": "Association administrator creates a competition owned by their authority",
+      "operation": "execute",
+      "sql": "INSERT INTO competitions(id,authority_id,name,created_by,created_at,updated_at) SELECT :id,:authority_id,trim(:name),:__user_id,:__now,:__now WHERE length(trim(:name)) > 0 AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = :authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL)",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "authority_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "not-idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_authority_clubs",
+      "description": "List the clubs linked to a competition authority, for that authority's administrators only",
+      "operation": "query",
+      "sql": "SELECT m.id AS membership_id, m.authority_id, m.org_id, o.name AS club_name, m.status, m.created_at FROM authority_club_memberships m JOIN organizations o ON o.id = m.org_id WHERE m.authority_id = :authority_id AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = :authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL) ORDER BY o.name, m.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "authority_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_authority_competitions",
+      "description": "List the competitions owned by a competition authority, for that authority's administrators only",
+      "operation": "query",
+      "sql": "SELECT c.id, c.authority_id, c.name, c.created_at, c.updated_at FROM competitions c WHERE c.authority_id = :authority_id AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = :authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL) ORDER BY c.created_at DESC, c.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "authority_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_my_scoped_roles",
+      "description": "List the caller's own active scoped role grants across every scope",
+      "operation": "query",
+      "sql": "SELECT r.id, r.scope_type, r.scope_id, r.role, r.created_at FROM scoped_role_grants r WHERE r.user_id = :__user_id AND r.revoked_at IS NULL ORDER BY r.created_at, r.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authenticated",
+        "roles": [],
+        "audience": "self",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "revoke_scoped_role",
+      "description": "Revoke a scoped role grant; the grant is kept with a revoked time rather than deleted",
+      "operation": "execute",
+      "sql": "UPDATE scoped_role_grants SET revoked_at = :__now, revoked_by = :__user_id WHERE id = :grant_id AND revoked_at IS NULL AND (EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL) OR (scoped_role_grants.scope_type = 'authority' AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = scoped_role_grants.scope_id AND a.role = 'association_admin' AND a.revoked_at IS NULL)))",
+      "params": {
+        "grant_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "scoped-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "grant_scoped_role",
+      "description": "Grant a scoped role: a site administrator may grant any role at any existing scope; an association administrator may grant association roles within their own authority. A revoked grant can be granted again.",
+      "operation": "execute",
+      "sql": "INSERT INTO scoped_role_grants(id,user_id,scope_type,scope_id,role,granted_by,created_at,revoked_at) SELECT :id,:user_id,:scope_type,:scope_id,:role,:__user_id,:__now,NULL WHERE length(trim(:user_id)) > 0 AND (CASE :scope_type WHEN 'site' THEN :scope_id = 'site' WHEN 'geo_area' THEN EXISTS (SELECT 1 FROM geo_areas g WHERE g.id = :scope_id) WHEN 'authority' THEN EXISTS (SELECT 1 FROM competition_authorities ca WHERE ca.id = :scope_id) WHEN 'club' THEN EXISTS (SELECT 1 FROM organizations o WHERE o.id = :scope_id) WHEN 'competition' THEN EXISTS (SELECT 1 FROM competitions c WHERE c.id = :scope_id) WHEN 'team' THEN EXISTS (SELECT 1 FROM teams t WHERE t.id = :scope_id) ELSE 0 END) AND (EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL) OR (:scope_type = 'authority' AND (:role = 'association_admin' OR :role = 'competition_manager' OR :role = 'viewer') AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = :scope_id AND a.role = 'association_admin' AND a.revoked_at IS NULL))) ON CONFLICT(user_id, scope_type, scope_id, role) DO UPDATE SET revoked_at = NULL, revoked_by = NULL, granted_by = excluded.granted_by WHERE scoped_role_grants.revoked_at IS NOT NULL",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "user_id": {
+          "type": "string"
+        },
+        "scope_type": {
+          "type": "string",
+          "enum": [
+            "site",
+            "geo_area",
+            "authority",
+            "club",
+            "competition",
+            "team"
+          ]
+        },
+        "scope_id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "site_admin",
+            "geo_admin",
+            "association_admin",
+            "club_admin",
+            "competition_manager",
+            "team_manager",
+            "scorer",
+            "member",
+            "viewer"
+          ]
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "scoped-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "link_club_to_authority",
+      "description": "Site administrator links a club to a competition authority (association). Association administrators cannot attach clubs. A club can be linked to several authorities.",
+      "operation": "execute",
+      "sql": "INSERT INTO authority_club_memberships(id,authority_id,org_id,status,created_by,created_at) SELECT :id,ca.id,o.id,'active',:__user_id,:__now FROM competition_authorities ca JOIN organizations o ON o.id = :org_id WHERE ca.id = :authority_id AND EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL) ON CONFLICT(authority_id, org_id) DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "authority_id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "site-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_geo_levels",
+      "description": "List the display label for each level of the geographic hierarchy (country, jurisdiction, region, locality). The labels are configuration, set by a site administrator.",
+      "operation": "query",
+      "sql": "SELECT l.level, l.position, l.label FROM geo_level_labels l WHERE length(COALESCE(:__user_id, '')) > 0 ORDER BY l.position, l.level LIMIT :limit OFFSET :offset",
+      "params": {
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authenticated",
+        "roles": [],
+        "audience": "self",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_geo_areas",
+      "description": "List geographic areas: the root areas (countries) when parent_id is empty, otherwise the children of that area. Each area carries its level and the configured label for that level.",
+      "operation": "query",
+      "sql": "SELECT g.id, g.parent_id, g.level, l.label AS level_label, g.name FROM geo_areas g JOIN geo_level_labels l ON l.level = g.level WHERE length(COALESCE(:__user_id, '')) > 0 AND ((NULLIF(:parent_id, '') IS NULL AND g.parent_id IS NULL) OR g.parent_id = NULLIF(:parent_id, '')) ORDER BY g.name, g.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "parent_id": {
+          "type": "string",
+          "default": ""
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authenticated",
+        "roles": [],
+        "audience": "self",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "link_club_venue",
+      "description": "Site administrator records that a club also uses a venue owned by another club. Only venues marked shared can be linked; the owning club stays the owner.",
+      "operation": "execute",
+      "sql": "INSERT INTO club_venues(id,org_id,venue_id,relationship,created_by,created_at) SELECT :id,o.id,v.id,'shared_use',:__user_id,:__now FROM organizations o JOIN venues v ON v.id = :venue_id WHERE o.id = :org_id AND v.shared = 1 AND v.org_id <> o.id AND EXISTS (SELECT 1 FROM scoped_role_grants p WHERE p.user_id = :__user_id AND p.scope_type = 'site' AND p.scope_id = 'site' AND p.role = 'site_admin' AND p.revoked_at IS NULL) ON CONFLICT(org_id, venue_id) DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "org_id": {
+          "type": "string"
+        },
+        "venue_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "site-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_club_venue_links",
+      "description": "List the venues a club is connected to: the ones it owns, and shared venues owned by another club that it also uses. Contact details are not part of a venue record.",
+      "operation": "query",
+      "sql": "SELECT v.id AS venue_id, v.name, v.address, v.map_url, 'owner' AS relationship FROM venues v WHERE v.org_id = :org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) UNION ALL SELECT v.id AS venue_id, v.name, v.address, v.map_url, cv.relationship FROM club_venues cv JOIN venues v ON v.id = cv.venue_id WHERE cv.org_id = :org_id AND EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.org_id = :org_id AND cm.user_id = :__user_id AND cm.is_active = 1 AND cm.role IN ('admin','convenor','manager')) ORDER BY name, venue_id LIMIT :limit OFFSET :offset",
+      "params": {
+        "org_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "club-manager",
+        "roles": [
+          "admin",
+          "convenor",
+          "manager"
+        ],
+        "audience": "manager",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "link_competition_season",
+      "description": "Association administrator attaches a season of a member club to a competition of their own association. The club must be an active member of that association.",
+      "operation": "execute",
+      "sql": "INSERT INTO competition_seasons(id,competition_id,season_id,created_by,created_at) SELECT :id,c.id,s.id,:__user_id,:__now FROM competitions c JOIN seasons s ON s.id = :season_id WHERE c.id = :competition_id AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = c.authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL) AND EXISTS (SELECT 1 FROM authority_club_memberships m WHERE m.authority_id = c.authority_id AND m.org_id = s.org_id AND m.status = 'active') ON CONFLICT(competition_id, season_id) DO NOTHING",
+      "params": {
+        "id": {
+          "type": "string"
+        },
+        "competition_id": {
+          "type": "string"
+        },
+        "season_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "assign_division_competition",
+      "description": "Association administrator places a division that has no competition yet into a competition of their own association. The division's season must already be attached to that competition.",
+      "operation": "execute",
+      "sql": "UPDATE divisions SET competition_id = :competition_id WHERE id = :division_id AND competition_id IS NULL AND EXISTS (SELECT 1 FROM competitions c JOIN competition_seasons cs ON cs.competition_id = c.id WHERE c.id = :competition_id AND cs.season_id = divisions.season_id AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = c.authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL))",
+      "params": {
+        "division_id": {
+          "type": "string"
+        },
+        "competition_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "idempotent",
+        "audit": true,
+        "paging": false,
+        "versioned": false,
+        "redacts": []
+      }
+    },
+    {
+      "name": "list_competition_seasons",
+      "description": "List the seasons attached to a competition, with the club that owns each season and how many of its divisions are in the competition. For that competition's association administrators only.",
+      "operation": "query",
+      "sql": "SELECT cs.id AS link_id, cs.competition_id, s.id AS season_id, s.name AS season_name, s.org_id, o.name AS club_name, (SELECT COUNT(*) FROM divisions d WHERE d.season_id = s.id AND d.competition_id = cs.competition_id) AS division_count FROM competition_seasons cs JOIN competitions c ON c.id = cs.competition_id JOIN seasons s ON s.id = cs.season_id JOIN organizations o ON o.id = s.org_id WHERE cs.competition_id = :competition_id AND EXISTS (SELECT 1 FROM scoped_role_grants a WHERE a.user_id = :__user_id AND a.scope_type = 'authority' AND a.scope_id = c.authority_id AND a.role = 'association_admin' AND a.revoked_at IS NULL) ORDER BY s.name, cs.id LIMIT :limit OFFSET :offset",
+      "params": {
+        "competition_id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "min": 1,
+          "max": 100
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "requires_auth": true,
+      "contract": {
+        "access": "authority-admin",
+        "roles": [],
+        "audience": "admin",
+        "idempotency": "read-only",
+        "audit": false,
+        "paging": true,
+        "versioned": false,
+        "redacts": []
       }
     }
   ]

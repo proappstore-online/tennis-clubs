@@ -1624,17 +1624,25 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "apply_draw_venues",
           "apply_fixture_result_to_fixture",
           "approve_fixture_review",
+          "assign_division_competition",
           "bootstrap_club_admin",
           "change_document_visibility",
+          "create_competition",
+          "create_competition_authority",
           "create_division",
           "create_external_club",
           "create_external_club_placeholder",
+          "create_geo_area",
           "create_season",
           "create_team",
           "create_team_invite",
           "create_venue",
           "deactivate_team_player",
           "delete_contact_detail",
+          "grant_scoped_role",
+          "link_club_to_authority",
+          "link_club_venue",
+          "link_competition_season",
           "mark_document_stored",
           "reconcile_imported_fixture_time",
           "record_draw_import_outcomes",
@@ -1653,9 +1661,11 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
           "restore_archive_team_players",
           "restore_archive_teams",
           "restore_archive_venues",
+          "revoke_scoped_role",
           "schedule_fixture",
           "set_contact_detail",
           "set_external_club_home_venue",
+          "set_geo_level_label",
           "set_team_player_pool",
           "set_venue_shared",
           "submit_fixture_result",
@@ -4005,6 +4015,507 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
       {
         "name": "row_counts",
         "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "create_geo_area",
+    "description": "Site administrator adds an area to the geographic hierarchy; a root area must be a country and a child must sit under a higher level",
+    "operation": "execute",
+    "roles": [],
+    "access": "site-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "parent_id",
+        "type": "string"
+      },
+      {
+        "name": "level",
+        "type": "string",
+        "enum": [
+          "country",
+          "jurisdiction",
+          "region",
+          "locality"
+        ]
+      },
+      {
+        "name": "name",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "set_geo_level_label",
+    "description": "Site administrator sets the display label for a geographic level, so terminology is deployment configuration",
+    "operation": "execute",
+    "roles": [],
+    "access": "site-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "level",
+        "type": "string",
+        "enum": [
+          "country",
+          "jurisdiction",
+          "region",
+          "locality"
+        ]
+      },
+      {
+        "name": "label",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "create_competition_authority",
+    "description": "Site administrator creates a competition authority (association) under a geographic area",
+    "operation": "execute",
+    "roles": [],
+    "access": "site-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "area_id",
+        "type": "string"
+      },
+      {
+        "name": "name",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "create_competition",
+    "description": "Association administrator creates a competition owned by their authority",
+    "operation": "execute",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "not-idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "authority_id",
+        "type": "string"
+      },
+      {
+        "name": "name",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_authority_clubs",
+    "description": "List the clubs linked to a competition authority, for that authority's administrators only",
+    "operation": "query",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "authority_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_authority_competitions",
+    "description": "List the competitions owned by a competition authority, for that authority's administrators only",
+    "operation": "query",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "authority_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_my_scoped_roles",
+    "description": "List the caller's own active scoped role grants across every scope",
+    "operation": "query",
+    "roles": [],
+    "access": "authenticated",
+    "audience": "self",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "revoke_scoped_role",
+    "description": "Revoke a scoped role grant; the grant is kept with a revoked time rather than deleted",
+    "operation": "execute",
+    "roles": [],
+    "access": "scoped-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "grant_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "grant_scoped_role",
+    "description": "Grant a scoped role: a site administrator may grant any role at any existing scope; an association administrator may grant association roles within their own authority. A revoked grant can be granted again.",
+    "operation": "execute",
+    "roles": [],
+    "access": "scoped-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "user_id",
+        "type": "string"
+      },
+      {
+        "name": "scope_type",
+        "type": "string",
+        "enum": [
+          "site",
+          "geo_area",
+          "authority",
+          "club",
+          "competition",
+          "team"
+        ]
+      },
+      {
+        "name": "scope_id",
+        "type": "string"
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "enum": [
+          "site_admin",
+          "geo_admin",
+          "association_admin",
+          "club_admin",
+          "competition_manager",
+          "team_manager",
+          "scorer",
+          "member",
+          "viewer"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "link_club_to_authority",
+    "description": "Site administrator links a club to a competition authority (association). Association administrators cannot attach clubs. A club can be linked to several authorities.",
+    "operation": "execute",
+    "roles": [],
+    "access": "site-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "authority_id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_geo_levels",
+    "description": "List the display label for each level of the geographic hierarchy (country, jurisdiction, region, locality). The labels are configuration, set by a site administrator.",
+    "operation": "query",
+    "roles": [],
+    "access": "authenticated",
+    "audience": "self",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "list_geo_areas",
+    "description": "List geographic areas: the root areas (countries) when parent_id is empty, otherwise the children of that area. Each area carries its level and the configured label for that level.",
+    "operation": "query",
+    "roles": [],
+    "access": "authenticated",
+    "audience": "self",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "parent_id",
+        "type": "string",
+        "default": ""
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "link_club_venue",
+    "description": "Site administrator records that a club also uses a venue owned by another club. Only venues marked shared can be linked; the owning club stays the owner.",
+    "operation": "execute",
+    "roles": [],
+    "access": "site-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "venue_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_club_venue_links",
+    "description": "List the venues a club is connected to: the ones it owns, and shared venues owned by another club that it also uses. Contact details are not part of a venue record.",
+    "operation": "query",
+    "roles": [
+      "admin",
+      "convenor",
+      "manager"
+    ],
+    "access": "club-manager",
+    "audience": "manager",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "org_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
+      }
+    ]
+  },
+  {
+    "name": "link_competition_season",
+    "description": "Association administrator attaches a season of a member club to a competition of their own association. The club must be an active member of that association.",
+    "operation": "execute",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "id",
+        "type": "string"
+      },
+      {
+        "name": "competition_id",
+        "type": "string"
+      },
+      {
+        "name": "season_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "assign_division_competition",
+    "description": "Association administrator places a division that has no competition yet into a competition of their own association. The division's season must already be attached to that competition.",
+    "operation": "execute",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "idempotent",
+    "audit": true,
+    "paging": false,
+    "versioned": false,
+    "params": [
+      {
+        "name": "division_id",
+        "type": "string"
+      },
+      {
+        "name": "competition_id",
+        "type": "string"
+      }
+    ]
+  },
+  {
+    "name": "list_competition_seasons",
+    "description": "List the seasons attached to a competition, with the club that owns each season and how many of its divisions are in the competition. For that competition's association administrators only.",
+    "operation": "query",
+    "roles": [],
+    "access": "authority-admin",
+    "audience": "admin",
+    "idempotency": "read-only",
+    "audit": false,
+    "paging": true,
+    "versioned": false,
+    "params": [
+      {
+        "name": "competition_id",
+        "type": "string"
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "default": 100,
+        "min": 1,
+        "max": 100
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "default": 0,
+        "min": 0
       }
     ]
   }

@@ -18,6 +18,10 @@ Issue #8. Every action in `mcp.json` is scoped to the authenticated caller. This
 | `creator` | The user who created the club, with no other membership. | `create_club`, `bootstrap_club_admin` |
 | `invite-token` | Holds a single-use invitation token. The token, not the club, is the authority, and the write binds the caller as the member. | `accept_team_invite`, `activate_invited_club_membership` |
 | `member` | An active member of the club, of any role. | `get_club`, `list_external_clubs`, `list_my_clubs` |
+| `site-admin` | An active site administrator (a `site_admin` grant at the site scope, not revoked). | `create_geo_area`, `set_geo_level_label`, `create_competition_authority`, `link_club_to_authority`, `link_club_venue` |
+| `authority-admin` | An active `association_admin` of the one competition authority the action names, not revoked. | `create_competition`, `list_authority_clubs`, `list_authority_competitions`, `link_competition_season`, `assign_division_competition`, `list_competition_seasons` |
+| `scoped-grant` | A site administrator, or an active association administrator acting inside their own authority. | `grant_scoped_role`, `revoke_scoped_role` |
+| `signed-in` | Any signed-in user. Used only for data that holds no club or person data (the geography and its labels). | `list_geo_levels`, `list_geo_areas` |
 
 Club-level actions are not listed here: their scope is the club role in `mcp.json`.
 
@@ -35,6 +39,12 @@ Club-level actions are not listed here: their scope is the club role in `mcp.jso
 - **`get_club`** (`member`): a club's name and slug, for an active member of that club.
 - **`list_external_clubs`** (`member`): a club's opponent clubs, read-only, for an active member of that club.
 - **`list_my_clubs`** (`member`): the caller's own active memberships.
+- **`create_geo_area`, `set_geo_level_label`, `create_competition_authority`, `link_club_venue`** (`site-admin`): only an active site administrator.
+- **`link_club_to_authority`** (`site-admin`): only an active site administrator links a club to an association. Association and club administrators cannot, and there is no consent step.
+- **`grant_scoped_role`, `revoke_scoped_role`** (`scoped-grant`): a site administrator for any scope; an association administrator only for association roles inside their own authority.
+- **`list_my_scoped_roles`** (`self`): the caller's own active grants.
+- **`create_competition`, `list_authority_clubs`, `list_authority_competitions`, `link_competition_season`, `assign_division_competition`, `list_competition_seasons`** (`authority-admin`): only the active administrator of that association. Another association's administrator, a club administrator and every other scoped role get no rows and change nothing.
+- **`list_geo_levels`, `list_geo_areas`** (`signed-in`): the geography and its configured labels, for any signed-in user.
 
 ## Cross-club access
 

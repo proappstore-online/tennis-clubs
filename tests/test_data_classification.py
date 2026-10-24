@@ -30,6 +30,9 @@ PUBLIC_NAME_EXCEPTIONS = {
     ("venues", "notes"): "venue access notes; the import blocks contact details in them",
     ("external_clubs", "canonical_name"): "an opponent club's name",
     ("external_clubs", "normalized_name"): "a normalised opponent club name",
+    ("geo_areas", "name"): "an administrative area's name (country, state or province, region, locality); no coordinates or addresses",
+    ("competition_authorities", "name"): "an association's name",
+    ("competitions", "name"): "a competition's name",
 }
 
 

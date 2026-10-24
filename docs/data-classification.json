@@ -60,6 +60,14 @@
       "target_id": "activity",
       "target_type": "technical"
     },
+    "authority_club_memberships": {
+      "authority_id": "technical",
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "org_id": "technical",
+      "status": "technical"
+    },
     "club_memberships": {
       "created_at": "technical",
       "display_name": "personal",
@@ -68,6 +76,36 @@
       "org_id": "technical",
       "role": "personal",
       "user_id": "personal"
+    },
+    "club_venues": {
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "org_id": "technical",
+      "relationship": "technical",
+      "venue_id": "technical"
+    },
+    "competition_authorities": {
+      "area_id": "technical",
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "name": "public"
+    },
+    "competition_seasons": {
+      "competition_id": "technical",
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "season_id": "technical"
+    },
+    "competitions": {
+      "authority_id": "technical",
+      "created_at": "technical",
+      "created_by": "personal",
+      "id": "technical",
+      "name": "public",
+      "updated_at": "technical"
     },
     "contact_details": {
       "created_at": "technical",
@@ -82,6 +120,7 @@
       "value": "contact"
     },
     "divisions": {
+      "competition_id": "technical",
       "created_at": "technical",
       "format": "public",
       "id": "technical",
@@ -253,6 +292,19 @@
       "updated_at": "technical",
       "venue_id": "technical"
     },
+    "geo_areas": {
+      "created_at": "technical",
+      "id": "technical",
+      "level": "technical",
+      "name": "public",
+      "parent_id": "technical"
+    },
+    "geo_level_labels": {
+      "created_at": "technical",
+      "label": "public",
+      "level": "technical",
+      "position": "technical"
+    },
     "import_issue_resolutions": {
       "actor_user_id": "personal",
       "code": "technical",
@@ -324,6 +376,17 @@
       "fixture_id": "technical",
       "id": "technical",
       "player_name": "personal"
+    },
+    "scoped_role_grants": {
+      "created_at": "technical",
+      "granted_by": "personal",
+      "id": "technical",
+      "revoked_at": "technical",
+      "revoked_by": "personal",
+      "role": "personal",
+      "scope_id": "technical",
+      "scope_type": "technical",
+      "user_id": "personal"
     },
     "seasons": {
       "created_at": "technical",

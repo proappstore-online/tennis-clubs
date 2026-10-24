@@ -267,6 +267,11 @@ class McpPermissionTests(unittest.TestCase):
             "restore_archive_team_players",
             "restore_archive_teams",
             "restore_archive_venues",
+            # Geography, authorities, scoped roles and the membership edges (issue #20): permission cases live in test_geo_authority_tenancy.py.
+            "create_geo_area", "set_geo_level_label", "list_geo_levels", "list_geo_areas", "create_competition_authority",
+            "grant_scoped_role", "revoke_scoped_role", "list_my_scoped_roles", "link_club_to_authority", "list_authority_clubs",
+            "create_competition", "list_authority_competitions", "link_club_venue", "list_club_venue_links",
+            "link_competition_season", "assign_division_competition", "list_competition_seasons",
             "set_my_fixture_availability", "log_my_fixture_availability_change", "accept_team_invite",
             "activate_invited_club_membership", "create_club", "bootstrap_club_admin", "can_create_first_club",
             "get_my_club_permissions", "get_club", "list_my_fixtures", "list_fixture_roster",
